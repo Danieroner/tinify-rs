@@ -36,7 +36,7 @@ tinify_rs = "0.1.0"
 use tinify_rs::tinify;
 
 fn main() {
-  let key = tinify::set_key("key api");
+  tinify::set_key("tinify api key");
 
   let source = tinify::from_file("./unoptimized.png");
   let compress = source.to_file("./optimized.png");
@@ -49,7 +49,7 @@ use tinify_rs::tinify;
 use std::fs;
 
 fn main() {}
-  let key = tinify::set_key("key api");
+  tinify::set_key("tinify api key");
 
   let bytes = fs::read("./unoptimized.png").unwrap();
   let buffer = tinify::from_buffer(&bytes).to_buffer();
