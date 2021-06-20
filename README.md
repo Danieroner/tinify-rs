@@ -23,7 +23,7 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify_rs = "0.1.0"
+tinify-rs = "0.1.1"
 ```
 ## Usage
 
