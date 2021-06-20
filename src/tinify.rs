@@ -18,8 +18,10 @@ lazy_static! {
 /// ```
 /// use tinify_rs::tinify;
 /// 
-/// let key = "tinify api key";
-/// tinify::set_key(key);
+/// fn main() {
+///   let key = "tinify api key";
+///   tinify::set_key(key);
+/// }
 /// ```
 pub fn set_key(new_key: &str) {
   let key = new_key.to_string();
@@ -45,6 +47,8 @@ pub fn get_client() -> Client {
 /// use tinify_rs::tinify;
 /// 
 /// fn main() {
+///   tinify::set_key("tinify api key");
+/// 
 ///   let source = tinify::from_file("./unoptimized.png");
 ///   let compress = source.to_file("./optimized.png");
 /// }
@@ -65,6 +69,8 @@ pub fn from_file(path: &str) -> Source {
 /// use std::fs;
 /// 
 /// fn main() {
+///   tinify::set_key("tinify api key");
+/// 
 ///   let bytes = fs::read("./unoptimized.png").unwrap();
 ///   let buffer = tinify::from_buffer(&bytes).to_buffer();
 ///   let save = fs::write("./optimized.png", buffer);
