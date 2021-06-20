@@ -141,24 +141,6 @@ mod tests {
     
     assert_eq!(client, expected);
   }
-
-  #[test]
-  fn test_from_file_get_source() {
-    initialize();
-    if !TMP_PATH.exists() {
-      create_file!();
-    }
-    let source = from_file(TMP_PATH.to_str().unwrap());
-    let cloned_url = source.url.clone();
-    let expected = Source {
-      url: cloned_url,
-    };
-    if TMP_PATH.exists() {
-      fs::remove_file(*TMP_PATH).unwrap();
-    }
-    
-    assert_eq!(source, expected);
-  }
   
   #[test]
   fn test_from_buffer_get_source() {
