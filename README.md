@@ -1,7 +1,7 @@
-tinify-rs
-==============
-
 # Tinify API client for Rust
+
+[![Build Status](https://github.com/Danieroner/tinify-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Danieroner/tinify-rs/actions)
+[![crates.io](https://img.shields.io/crates/v/tinify-rs.svg)](https://crates.io/crates/tinify-rs)
 
 Rust client for the Tinify API, used for [TinyPNG](https://tinypng.com) and [TinyJPG](https://tinyjpg.com). Tinify compresses your images intelligently. Read more at [https://tinify.com](https://tinify.com).
 
@@ -66,7 +66,3 @@ cargo test
 ## Contribution
 
 All contributions will be welcomed. Feel free to open any issues or pull requests.
-
-## License
-
-This software is licensed under the MIT License. [View the license](LICENSE).
