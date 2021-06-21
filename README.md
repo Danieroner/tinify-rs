@@ -43,6 +43,18 @@ fn main() {
 }
 ```
 
+- Compress from an url file
+```rust
+use tinify_rs::tinify;
+
+fn main() {
+  tinify::set_key("tinify api key");
+
+  let source = tinify::from_url("https://tinypng.com/images/panda-happy.png");
+  let compress = source.to_file("./optimized.png");
+}
+```
+
 - Compress from a file buffer
 ```rust
 use tinify_rs::tinify;
