@@ -83,6 +83,27 @@ pub fn from_buffer(buffer: &Vec<u8>) -> Source {
   source
 }
 
+/// Choose an url file to compress
+///
+/// # Examples
+///
+/// ```
+/// use tinify_rs::tinify;
+/// 
+/// fn main() {
+///   tinify::set_key("tinify api key");
+/// 
+///   let source = tinify::from_url("https://tinypng.com/images/panda-happy.png");
+///   let compress = source.to_file("./optimized.png");
+/// }
+/// ```
+pub fn from_url(url: &str) -> Source {
+  let source = Source::new(None)
+    .from_url(url);
+
+  source
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
