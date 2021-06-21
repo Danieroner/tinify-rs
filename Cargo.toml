@@ -15,9 +15,6 @@ keywords = [
   "tinyjpg", 
   "compress", 
   "optimize", 
-  "optimize", 
-  "api",
-  "client"
 ]
 
 [dependencies]
