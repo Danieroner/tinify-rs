@@ -24,7 +24,7 @@ lazy_static! {
 /// }
 /// ```
 pub fn set_key(new_key: &str) {
-  let key = new_key.to_string();
+  let key = new_key.to_owned();
   OPTIONS.lock().unwrap().insert("key", key);
 }
 
@@ -87,25 +87,12 @@ pub fn from_buffer(buffer: &Vec<u8>) -> Source {
 mod tests {
   use super::*;
   use crate::create_file;
-  use crate::client::Client;
-  use lazy_static::lazy_static;
-  use std::sync::Once;
+  use crate::tmp_file::MockClient;
   use std::path::Path;
   use std::fs;
 
   lazy_static! {
-    static ref INIT: Once = Once::new();
-    static ref PRIVATE_KEY: &'static str = "yjb7YwqyRZwzkGtCfDt6qmXs3QRQTJz3";
     static ref TMP_PATH: &'static Path = Path::new("./tmp_test_image.png");
-    static ref CLIENT: Client = Client {
-      key: String::from(*PRIVATE_KEY),
-    };
-  }
-
-  fn initialize() {
-    INIT.call_once(|| {
-      set_key(*PRIVATE_KEY);
-    });
   }
 
   #[test]
@@ -124,19 +111,21 @@ mod tests {
 
   #[test]
   fn test_set_key_into_hash_map() {
-    initialize();
-    OPTIONS.lock().unwrap().insert("key", String::from(*PRIVATE_KEY));
+    let mock_client = MockClient::new();
+    set_key(mock_client.key);
+    OPTIONS.lock().unwrap().insert("key", mock_client.key.to_owned());
     let test_key = OPTIONS.lock().unwrap().get("key").unwrap().clone();
 
-    assert_eq!(test_key, String::from(*PRIVATE_KEY));
+    assert_eq!(test_key, mock_client.key.to_owned());
   }
 
   #[test]
   fn test_get_one_client() {
-    initialize();
+    let mock_client = MockClient::new();
+    set_key(mock_client.key);
     let client = get_client();
     let expected = Client {
-      key: String::from(*PRIVATE_KEY),
+      key: mock_client.key.to_owned(),
     };
     
     assert_eq!(client, expected);
@@ -144,7 +133,8 @@ mod tests {
   
   #[test]
   fn test_from_buffer_get_source() {
-    initialize();
+    let mock_client = MockClient::new();
+    set_key(mock_client.key);
     if !TMP_PATH.exists() {
       create_file!();
     }
@@ -154,9 +144,6 @@ mod tests {
     let expected = Source {
       url: cloned_url,
     };
-    if TMP_PATH.exists() {
-      fs::remove_file(*TMP_PATH).unwrap();
-    }
 
     assert_eq!(source, expected);
   }
