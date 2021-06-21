@@ -1,7 +1,7 @@
-tinify-rs
-==============
-
 # Tinify API client for Rust
+
+[![Build Status](https://github.com/Danieroner/tinify-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Danieroner/tinify-rs/actions)
+[![crates.io](https://img.shields.io/crates/v/tinify-rs.svg)](https://crates.io/crates/tinify-rs)
 
 Rust client for the Tinify API, used for [TinyPNG](https://tinypng.com) and [TinyJPG](https://tinyjpg.com). Tinify compresses your images intelligently. Read more at [https://tinify.com](https://tinify.com).
 
@@ -23,7 +23,7 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "0.1.1"
+tinify-rs = "0.2.0"
 ```
 ## Usage
 
@@ -39,6 +39,18 @@ fn main() {
   tinify::set_key("tinify api key");
 
   let source = tinify::from_file("./unoptimized.png");
+  let compress = source.to_file("./optimized.png");
+}
+```
+
+- Compress from an url file
+```rust
+use tinify_rs::tinify;
+
+fn main() {
+  tinify::set_key("tinify api key");
+
+  let source = tinify::from_url("https://tinypng.com/images/panda-happy.png");
   let compress = source.to_file("./optimized.png");
 }
 ```
@@ -66,7 +78,3 @@ cargo test
 ## Contribution
 
 All contributions will be welcomed. Feel free to open any issues or pull requests.
-
-## License
-
-This software is licensed under the MIT License. [View the license](LICENSE).

@@ -1,7 +1,7 @@
-use crate::client;
 use crate::result;
 use crate::tinify;
 use crate::error::TinifyResponse;
+use crate::client::Method;
 use lazy_static::lazy_static;
 use std::sync::Mutex;
 use std::path::Path;
@@ -26,11 +26,7 @@ impl Source {
     Self { url }
   }
 
-  fn replace_buffer(
-    &self, 
-    buffer: &mut Vec<u8>, 
-    compressed_image: Vec<u8>,
-  ) {
+  fn replace_buffer(&self, buffer: &mut Vec<u8>, compressed_image: Vec<u8>) {
     mem::replace(&mut *buffer, compressed_image);
   }
 
@@ -48,12 +44,32 @@ impl Source {
   pub fn from_buffer(&self, buffer: Vec<u8>) -> Self {
     let response = tinify::get_client()
       .request(
-        client::Method::POST,
-        &Path::new("/shrink"),
+        Method::POST,
+        Path::new("/shrink"),
         Some(&buffer),
     );
 
     self.get_source_from_response(response.unwrap())
+  }
+
+  pub fn from_url(&self, url: &str) -> Self {
+    let get_response = tinify::get_client()
+      .request(
+        Method::GET,
+        Path::new(url),
+        None,
+      );
+
+    let bytes = get_response.unwrap().bytes().unwrap().to_vec();
+
+    let post_response = tinify::get_client()
+      .request(
+        Method::POST,
+        Path::new("/shrink"),
+        Some(&bytes),
+    );
+
+    self.get_source_from_response(post_response.unwrap())
   }
 
   pub fn get_source_from_response(&self, response: TinifyResponse) -> Self {
@@ -64,7 +80,7 @@ impl Source {
     }
     let bytes = tinify::get_client()
       .request(
-        client::Method::GET,
+        Method::GET,
         Path::new(&url),
         None,
     );
@@ -100,35 +116,22 @@ impl Source {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::tinify;
   use crate::create_file;
-  use crate::client::{Method, Client};
-  use lazy_static::lazy_static;
-  use std::sync::Once;
+  use crate::tmp_file::MockClient;
 
   lazy_static! {
-    static ref INIT: Once = Once::new();
-    static ref PRIVATE_KEY: &'static str = "yjb7YwqyRZwzkGtCfDt6qmXs3QRQTJz3";
     static ref TMP_PATH: &'static str = "./tmp_test_image.png";
-    static ref CLIENT: Client = Client {
-      key: String::from(*PRIVATE_KEY),
-    };
-  }
-
-  fn initialize() {
-    INIT.call_once(|| {
-      tinify::set_key(*PRIVATE_KEY);
-    });
   }
 
   #[test]
   fn test_from_file_get_source() {
-    initialize();
     let path = Path::new(*TMP_PATH);
     if !path.exists() {
       create_file!();
     }
-    let source = Source::new(None).from_file(path.to_str().unwrap());
+    let mock_client = MockClient::new();
+    tinify::set_key(mock_client.key);
+    let source = Source::new(None).from_file(*TMP_PATH);
     let expected = Source::new(source.url.clone());
     if path.exists() {
       fs::remove_file(path).unwrap();
@@ -139,7 +142,8 @@ mod tests {
 
   #[test]
   fn test_from_buffer_get_source() {
-    initialize();
+    let mock_client = MockClient::new();
+    tinify::set_key(mock_client.key);
     let path = Path::new(*TMP_PATH);
     if !path.exists() {
       create_file!();
@@ -155,15 +159,27 @@ mod tests {
   }
 
   #[test]
+  fn test_from_url_get_source() {
+    let mock_client = MockClient::new();
+    tinify::set_key(mock_client.key);
+    let path = "https://tinypng.com/images/panda-happy.png";
+    let source = Source::new(None).from_url(path);
+    let expected = Source::new(source.url.clone());
+
+    assert_eq!(source, expected);
+  }
+
+  #[test]
   fn test_get_source_from_response() {
-    initialize();
     let path = Path::new(*TMP_PATH);
     if !path.exists() {
       create_file!();
     }
-    let buffer = fs::read(Path::new(*TMP_PATH)).unwrap();
+    let buffer = fs::read(*TMP_PATH).unwrap();
     let url_endpoint = Path::new("/shrink");
-    let response = CLIENT.request(
+    let mock_client = MockClient::new();
+    tinify::set_key(mock_client.key);
+    let response = mock_client.request(
       Method::POST, 
       url_endpoint, 
       Some(&buffer),
@@ -171,6 +187,9 @@ mod tests {
     let source = Source::new(None)
       .get_source_from_response(response.unwrap());
     let expected = Source::new(source.url.clone());
+    if path.exists() {
+      fs::remove_file(path).unwrap();
+    }
     
     assert_eq!(source, expected);
   }

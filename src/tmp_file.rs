@@ -1,3 +1,9 @@
+#![allow(dead_code)]
+
+use crate::error::TinifyResult;
+use crate::client::{Method, Client};
+use std::path::Path;
+
 #[macro_export]
 macro_rules! create_file {
   () => {
@@ -39,6 +45,30 @@ macro_rules! create_file {
   
     let tmp = Path::new("./tmp_test_image.png");
     img_buf.save(tmp).unwrap();
+  }
+}
+
+pub struct MockClient<'a> {
+  pub key: &'a str,
+}
+
+impl<'a> MockClient<'a> {
+  pub fn new() -> Self {
+    Self {
+      key: "yjb7YwqyRZwzkGtCfDt6qmXs3QRQTJz3",
+    }
+  }
+
+  pub fn request(
+    &self, 
+    method: Method, 
+    path: &Path, 
+    buffer: Option<&Vec<u8>>
+  ) -> TinifyResult {
+    let client = Client {
+      key: self.key.to_owned(),
+    };
+    client.request(method, path, buffer)
   }
 }
 
