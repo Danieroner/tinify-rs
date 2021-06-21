@@ -52,6 +52,26 @@ impl Source {
     self.get_source_from_response(response.unwrap())
   }
 
+  pub fn from_url(&self, url: &str) -> Self {
+    let get_response = tinify::get_client()
+      .request(
+        Method::GET,
+        Path::new(url),
+        None,
+      );
+
+    let bytes = get_response.unwrap().bytes().unwrap().to_vec();
+
+    let post_response = tinify::get_client()
+      .request(
+        Method::POST,
+        Path::new("/shrink"),
+        Some(&bytes),
+    );
+
+    self.get_source_from_response(post_response.unwrap())
+  }
+
   pub fn get_source_from_response(&self, response: TinifyResponse) -> Self {
     let location = response.headers().get("location").unwrap();
     let mut url = String::new();
@@ -134,6 +154,17 @@ mod tests {
     if path.exists() {
       fs::remove_file(path).unwrap();
     }
+
+    assert_eq!(source, expected);
+  }
+
+  #[test]
+  fn test_from_url_get_source() {
+    let mock_client = MockClient::new();
+    tinify::set_key(mock_client.key);
+    let path = "https://tinypng.com/images/panda-happy.png";
+    let source = Source::new(None).from_url(path);
+    let expected = Source::new(source.url.clone());
 
     assert_eq!(source, expected);
   }
