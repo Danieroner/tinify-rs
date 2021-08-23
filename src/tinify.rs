@@ -1,5 +1,5 @@
 use crate::client::Client;
-use crate::source::Source;
+pub use crate::source::Source;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
 use std::sync::Mutex;
