@@ -1,4 +1,4 @@
-use crate::client::Client;
+pub use crate::client::Client;
 pub use crate::source::Source;
 use lazy_static::lazy_static;
 use std::collections::HashMap;
