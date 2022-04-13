@@ -29,7 +29,11 @@ impl Client {
     path: &Path, 
     buffer: Option<&Vec<u8>>
   ) -> TinifyResult {
-    let url = format!("{}{}", API_ENDPOINT, path.to_str().unwrap());
+    let url = format!(
+      "{}{}",
+      API_ENDPOINT,
+      path.to_str().unwrap(),
+    );
     let client = BlockingClient::new();
     let timeout = Duration::from_secs(240 as u64);
     let response = match method {
@@ -59,7 +63,10 @@ impl Client {
       }
     }
     
-    let request_status = response.as_ref().unwrap().status();
+    let request_status = response
+      .as_ref()
+      .unwrap()
+      .status();
 
     match request_status {
       StatusCode::UNAUTHORIZED => {
@@ -90,42 +97,35 @@ impl Client {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::create_file;
+  use crate::mock::MockClient;
   use lazy_static::lazy_static;
   use std::path::Path;
   use std::fs;
 
   lazy_static! {
-    static ref CLIENT: Client = Client {
-      key: String::from("yjb7YwqyRZwzkGtCfDt6qmXs3QRQTJz3"),
-    };
+    static ref MOCK_CLIENT: MockClient = MockClient::new();
   }
 
   #[test]
   fn test_get_200_status_request() {
     let test_url = Path::new(API_ENDPOINT);
-    let response = CLIENT.request(Method::GET, test_url, None).unwrap();
+    let response = MOCK_CLIENT
+      .request(Method::GET, test_url, None)
+      .unwrap();
   
     assert_eq!(response.status(), 200);
   }
 
   #[test]
   fn test_post_201_status_created() {
-    let path = Path::new("./tmp_test_image.png");
-    if !path.exists() {
-      create_file!();
-    }
-    let tmp_image = fs::read("./tmp_test_image.png").unwrap();
+    let tmp_image = fs::read("./tmp_image.jpg").unwrap();
     let buffer = tmp_image.to_vec();
     let url_endpoint = Path::new("/shrink");
-    let response = CLIENT.request(
+    let response = MOCK_CLIENT.request(
       Method::POST, 
       url_endpoint, 
       Some(&buffer),
     );
-    if path.exists() {
-      fs::remove_file(path).unwrap();
-    }
     
     assert_eq!(response.unwrap().status(), 201);
   }
