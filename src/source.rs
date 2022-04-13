@@ -26,7 +26,11 @@ impl Source {
     Self { url }
   }
 
-  fn replace_buffer(&self, buffer: &mut Vec<u8>, compressed_image: Vec<u8>) {
+  fn replace_buffer(
+    &self,
+    buffer: &mut Vec<u8>,
+    compressed_image: Vec<u8>,
+  ) {
     mem::replace(&mut *buffer, compressed_image);
   }
 
@@ -60,7 +64,11 @@ impl Source {
         None,
       );
 
-    let bytes = get_response.unwrap().bytes().unwrap().to_vec();
+    let bytes = get_response
+      .unwrap()
+      .bytes()
+      .unwrap()
+      .to_vec();
 
     let post_response = tinify::get_client()
       .request(
@@ -72,20 +80,41 @@ impl Source {
     self.get_source_from_response(post_response.unwrap())
   }
 
-  pub fn get_source_from_response(&self, response: TinifyResponse) -> Self {
-    let location = response.headers().get("location").unwrap();
+  pub fn get_source_from_response(
+    &self,
+    response:
+    TinifyResponse
+  ) -> Self {
+    let location = response
+      .headers()
+      .get("location")
+      .unwrap();
+
     let mut url = String::new();
+
     if location.len() > 0 {
-      url.push_str(str::from_utf8(&location.as_bytes()).unwrap());
+      url.push_str(
+        str::from_utf8(&location.as_bytes()).unwrap()
+      );
     }
+
     let bytes = tinify::get_client()
       .request(
         Method::GET,
         Path::new(&url),
         None,
-    );
-    let compressed_buffer = bytes.unwrap().bytes().unwrap().to_vec();
-    let mut buffer_state = BUFFER.lock().expect("Could not lock mutex");
+      );
+
+    let compressed_buffer = bytes
+      .unwrap()
+      .bytes()
+      .unwrap()
+      .to_vec();
+
+    let mut buffer_state = BUFFER
+      .lock()
+      .expect("Could not lock mutex");
+
     self.replace_buffer(&mut buffer_state, compressed_buffer);
     let source = Source::new(Some(url));
 
@@ -116,52 +145,36 @@ impl Source {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::create_file;
-  use crate::tmp_file::MockClient;
+  use crate::mock::MockClient;
 
   lazy_static! {
-    static ref TMP_PATH: &'static str = "./tmp_test_image.png";
+    static ref MOCK_CLIENT: MockClient = MockClient::new();
+    static ref TMP_PATH: &'static str = "./tmp_image.jpg";
   }
 
   #[test]
   fn test_from_file_get_source() {
-    let path = Path::new(*TMP_PATH);
-    if !path.exists() {
-      create_file!();
-    }
-    let mock_client = MockClient::new();
-    tinify::set_key(mock_client.key);
+    tinify::set_key(MOCK_CLIENT.key.as_str());
     let source = Source::new(None).from_file(*TMP_PATH);
     let expected = Source::new(source.url.clone());
-    if path.exists() {
-      fs::remove_file(path).unwrap();
-    }
     
     assert_eq!(source, expected);
   }
 
   #[test]
   fn test_from_buffer_get_source() {
-    let mock_client = MockClient::new();
-    tinify::set_key(mock_client.key);
+    tinify::set_key(MOCK_CLIENT.key.as_str());
     let path = Path::new(*TMP_PATH);
-    if !path.exists() {
-      create_file!();
-    }
     let buffer = fs::read(path).unwrap();
     let source = Source::new(None).from_buffer(buffer);
     let expected = Source::new(source.url.clone());
-    if path.exists() {
-      fs::remove_file(path).unwrap();
-    }
 
     assert_eq!(source, expected);
   }
 
   #[test]
   fn test_from_url_get_source() {
-    let mock_client = MockClient::new();
-    tinify::set_key(mock_client.key);
+    tinify::set_key(MOCK_CLIENT.key.as_str());
     let path = "https://tinypng.com/images/panda-happy.png";
     let source = Source::new(None).from_url(path);
     let expected = Source::new(source.url.clone());
@@ -171,15 +184,10 @@ mod tests {
 
   #[test]
   fn test_get_source_from_response() {
-    let path = Path::new(*TMP_PATH);
-    if !path.exists() {
-      create_file!();
-    }
     let buffer = fs::read(*TMP_PATH).unwrap();
     let url_endpoint = Path::new("/shrink");
-    let mock_client = MockClient::new();
-    tinify::set_key(mock_client.key);
-    let response = mock_client.request(
+    tinify::set_key(MOCK_CLIENT.key.as_str());
+    let response = MOCK_CLIENT.request(
       Method::POST, 
       url_endpoint, 
       Some(&buffer),
@@ -187,9 +195,6 @@ mod tests {
     let source = Source::new(None)
       .get_source_from_response(response.unwrap());
     let expected = Source::new(source.url.clone());
-    if path.exists() {
-      fs::remove_file(path).unwrap();
-    }
     
     assert_eq!(source, expected);
   }
