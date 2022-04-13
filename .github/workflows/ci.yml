@@ -9,6 +9,13 @@ jobs:
       - name: Clone repository
         uses: actions/checkout@v2
 
+      - name: Make env file
+        uses: SpicyPizza/create-envfile@v1.3
+        with:
+          envkey_KEY: ${{ secrets.KEY }}
+          file_name: .env
+          fail_on_empty: true
+
       - name: Install rust
         uses: hecrj/setup-rust-action@v1
         with:
