@@ -1,8 +1,8 @@
 use reqwest::blocking::Response as ReqwestResponse;
 use reqwest::Error as ReqwestError;
 use reqwest::StatusCode;
-use std::process;
 use std::fmt;
+use std::process;
 
 type TinifyError = ReqwestError;
 pub type TinifyResponse = ReqwestResponse;
@@ -20,35 +20,34 @@ impl fmt::Display for TinifyException {
     match self {
       TinifyException::AccountException => {
         write!(
-          fmt, 
+          fmt,
           "There was a problem with your API key or with your API account.",
         )
-      },
+      }
       TinifyException::ClientException => {
         write!(
-          fmt, 
+          fmt,
           "The request could not be completed because of a problem with the submitted data.",
         )
-      },
+      }
       TinifyException::ServerException => {
         write!(
-          fmt, 
+          fmt,
           "The request could not be completed because of a temporary problem with the Tinify API.",
         )
-      },
+      }
     }
-    
   }
 }
 
 pub fn exit_error(
-  type_exception: TinifyException, 
+  type_exception: TinifyException,
   status_code: &StatusCode,
 ) {
   eprintln!(
-    "{} status: {}", 
-    type_exception.to_string(), 
-    &status_code
+    "{} status: {}",
+    type_exception.to_string(),
+    &status_code,
   );
   process::exit(1);
 }
