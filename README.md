@@ -23,7 +23,7 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "0.2.0"
+tinify-rs = "0.2.1"
 ```
 ## Usage
 
@@ -70,6 +70,8 @@ fn main() {}
 ```
 
 ## Running tests
+
+Create a .env file with a TiniPNG KEY
 
 ```
 cargo test
