@@ -29,11 +29,22 @@ pub fn set_key(new_key: &str) {
 }
 
 pub fn get_client() -> Client {
-  let contains_key = OPTIONS.lock().unwrap().contains_key("key");
+  let contains_key = OPTIONS
+    .lock()
+    .unwrap()
+    .contains_key("key");
+
   if !contains_key {
     panic!("Provide an API key with tinify::set_key(key)");
   }
-  let key = OPTIONS.lock().unwrap().get("key").unwrap().clone();
+
+  let key = OPTIONS
+    .lock()
+    .unwrap()
+    .get("key")
+    .unwrap()
+    .clone();
+
   let client = Client::new(key);
   
   client
@@ -107,46 +118,61 @@ pub fn from_url(url: &str) -> Source {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::create_file;
-  use crate::tmp_file::MockClient;
+  use crate::mock::MockClient;
   use std::path::Path;
   use std::fs;
 
   lazy_static! {
-    static ref TMP_PATH: &'static Path = Path::new("./tmp_test_image.png");
+    static ref MOCK_CLIENT: MockClient = MockClient::new();
+    static ref TMP_PATH: &'static Path = Path::new("./tmp_image.jpg");
   }
 
   #[test]
-  #[should_panic(expected="Provide an API key with tinify::set_key(key)")]
+  #[should_panic(
+    expected="Provide an API key with tinify::set_key(key)"
+  )]
   fn test_not_set_key() {
-    if !TMP_PATH.exists() {
-      create_file!();
-    }
-    let contains_key = OPTIONS.lock().unwrap().contains_key("key");
+    let contains_key = OPTIONS
+      .lock()
+      .unwrap()
+      .contains_key("key");
+
     if contains_key {
-      OPTIONS.lock().unwrap().remove("key").unwrap();
+      OPTIONS
+        .lock()
+        .unwrap()
+        .remove("key")
+        .unwrap();
     }
-    let source = from_file("./tmp_test_image.png");
+
+    let source = from_file("./tmp_image.jpg");
     let _compress = source.to_file("./optimized.png");
   }
 
   #[test]
   fn test_set_key_into_hash_map() {
-    let mock_client = MockClient::new();
-    set_key(mock_client.key);
-    OPTIONS.lock().unwrap().insert("key", mock_client.key.to_owned());
-    let test_key = OPTIONS.lock().unwrap().get("key").unwrap().clone();
+    set_key(MOCK_CLIENT.key.as_str());
+    OPTIONS
+      .lock()
+      .unwrap()
+      .insert("key", MOCK_CLIENT.key.to_owned());
 
-    assert_eq!(test_key, mock_client.key.to_owned());
+    let test_key = OPTIONS
+      .lock()
+      .unwrap()
+      .get("key")
+      .unwrap()
+      .clone();
+
+    assert_eq!(test_key, MOCK_CLIENT.key.to_owned());
   }
 
   #[test]
   fn test_get_one_client() {
-    let mock_client = MockClient::new();
-    set_key(mock_client.key);
+    set_key(MOCK_CLIENT.key.as_str());
     let client = get_client();
     let expected = Client {
-      key: mock_client.key.to_owned(),
+      key: MOCK_CLIENT.key.to_owned(),
     };
     
     assert_eq!(client, expected);
@@ -154,11 +180,7 @@ mod tests {
   
   #[test]
   fn test_from_buffer_get_source() {
-    let mock_client = MockClient::new();
-    set_key(mock_client.key);
-    if !TMP_PATH.exists() {
-      create_file!();
-    }
+    set_key(MOCK_CLIENT.key.as_str());
     let buffer = fs::read(*TMP_PATH).unwrap();
     let source = from_buffer(&buffer);
     let cloned_url = source.url.clone();
