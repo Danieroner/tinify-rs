@@ -60,7 +60,7 @@ fn main() {
 use tinify_rs::tinify;
 use std::fs;
 
-fn main() {}
+fn main() {
   tinify::set_key("tinify api key");
 
   let bytes = fs::read("./unoptimized.png").unwrap();
