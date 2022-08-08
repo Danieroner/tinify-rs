@@ -179,57 +179,101 @@ impl Source {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::mock::MockClient;
+  use dotenv::dotenv;
+  use std::env;
+  use std::fs;
 
-  lazy_static! {
-    static ref MOCK_CLIENT: MockClient = MockClient::new();
-    static ref TMP_PATH: &'static str = "./tmp_image.jpg";
+  fn get_key() -> String {
+    let key = match env::var("KEY") {
+      Ok(key) => key,
+      Err(_err) => panic!("No such file or directory."),
+    };
+
+    key
   }
 
   #[test]
-  fn test_from_file_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let source = Source::new(None).from_file(*TMP_PATH);
-    let expected = Source::new(source.url.clone());
-    
-    assert_eq!(source, expected);
+  fn test_get_request() -> Result<(), TinifyError> {
+    let source = Source::new(None, None);
+    let url = "https://tinypng.com/images/panda-happy.png";
+    let _ = source.request(Method::Get, url, None)?;
+
+    Ok(())
+  }
+  
+  #[test]
+  fn test_post_request() -> Result<(), TinifyError> {
+    dotenv().ok();
+    let key = get_key();
+    let source = Source::new(None, Some(key));
+    let path = Path::new("./tmp_image.jpg");
+    let bytes = fs::read(path).unwrap();
+    let _ = source
+      .request(Method::Post, "/shrink", Some(&bytes))?;
+
+    Ok(())
   }
 
   #[test]
-  fn test_from_buffer_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let path = Path::new(*TMP_PATH);
-    let buffer = fs::read(path).unwrap();
-    let source = Source::new(None).from_buffer(buffer);
-    let expected = Source::new(source.url.clone());
-
-    assert_eq!(source, expected);
+  fn test_from_file() -> Result<(), TinifyException> {
+    dotenv().ok();
+    let key = get_key();
+    let path = Path::new("./tmp_image.jpg");
+    let source = Source::new(None, Some(key));
+    let _ = source.from_file(path)?;
+    Ok(())
   }
 
   #[test]
-  fn test_from_url_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let path = "https://tinypng.com/images/panda-happy.png";
-    let source = Source::new(None).from_url(path);
-    let expected = Source::new(source.url.clone());
-
-    assert_eq!(source, expected);
+  fn test_from_url() -> Result<(), TinifyException> {
+    dotenv().ok();
+    let key = get_key();
+    let url = "https://tinypng.com/images/panda-happy.png";
+    let _ = Source::new(None, Some(key)).from_url(url)?;
+    Ok(())
   }
 
   #[test]
   fn test_get_source_from_response() {
-    let buffer = fs::read(*TMP_PATH).unwrap();
-    let url_endpoint = Path::new("/shrink");
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let response = MOCK_CLIENT.request(
-      Method::POST, 
-      url_endpoint, 
-      Some(&buffer),
-    );
-    let source = Source::new(None)
-      .get_source_from_response(response.unwrap());
-    let expected = Source::new(source.url.clone());
-    
-    assert_eq!(source, expected);
+    let key = get_key();
+    let path = Path::new("./tmp_image.jpg");
+    let source = Source::new(None, Some(key.clone()));
+    let bytes = fs::read(path).unwrap();
+    let get_resp = source.request(Method::Post, "/shrink", Some(&bytes)).unwrap();
+    let actual = source.get_source_from_response(get_resp);
+    let mut expected = Source::new(None, Some(key.clone()));
+    expected.buffer = actual.buffer.clone();
+    expected.url = actual.url.clone();
+
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_to_file() {
+    let key = get_key();
+    let tmp = "./tmp_image.jpg";
+    let location = "./new_image.jpg";
+    let bytes = fs::read(tmp).unwrap();
+    let mut source = Source::new(None, Some(key.clone()));
+    source.buffer = Some(bytes);
+    let _ = source.to_file(location);
+    let exists = Path::exists(Path::new(location));
+
+    assert!(exists);
+
+    if exists {
+      fs::remove_file(location).unwrap();
+    }
+  }
+
+  #[test]
+  fn test_to_buffer() {
+    let tmp = "./tmp_image.jpg";
+    let expected = fs::read(tmp).unwrap();
+    let mut source = Source::new(None, None);
+    source.buffer = Some(expected.clone());
+    let actual = source.to_buffer();
+
+    assert_eq!(actual, expected);
   }
 }
