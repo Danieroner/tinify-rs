@@ -162,18 +162,6 @@ impl Source {
     self
   }
 
-  pub fn result(&self) -> result::Result {
-    if self.url.as_ref().unwrap().len() == 0 {
-      eprintln!("Url is empty.");
-      process::exit(1);
-    }
-    let result = result::Result {
-      data: BUFFER.lock().unwrap(),
-    };
-
-    result
-  }
-
   pub fn to_file(&self, path: &str) -> io::Result<()> {
     self.result().to_file(&path, self.url.as_ref())
   }
