@@ -172,7 +172,7 @@ impl Source {
   }
 
   pub fn to_buffer(&self) -> Vec<u8> {
-    self.result().to_buffer()
+    self.buffer.as_ref().unwrap().to_vec()
   }
 }
 
