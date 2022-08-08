@@ -117,15 +117,11 @@ impl Source {
     Ok(self.from_buffer(&buffer))
   }
 
-  pub fn from_buffer(&self, buffer: Vec<u8>) -> Self {
-    let response = tinify::get_client()
-      .request(
-        Method::POST,
-        Path::new("/shrink"),
-        Some(&buffer),
-    );
+  pub fn from_buffer(self, buffer: &[u8]) -> Self {
+    let resp = self
+      .request(Method::Post, "/shrink", Some(buffer));
 
-    self.get_source_from_response(response.unwrap())
+    self.get_source_from_response(resp.unwrap())
   }
 
   pub fn from_url(&self, url: &str) -> Self {
