@@ -163,7 +163,12 @@ impl Source {
   }
 
   pub fn to_file(&self, path: &str) -> io::Result<()> {
-    self.result().to_file(&path, self.url.as_ref())
+    let file = File::create(path)?;
+    let mut reader = BufWriter::new(file);
+    reader.write_all(self.buffer.as_ref().unwrap())?;
+    reader.flush()?;
+
+    Ok(())
   }
 
   pub fn to_buffer(&self) -> Vec<u8> {
