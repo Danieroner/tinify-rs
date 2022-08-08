@@ -139,44 +139,27 @@ impl Source {
   }
 
   pub fn get_source_from_response(
-    &self,
-    response:
-    TinifyResponse
+    mut self,
+    response: TinifyResponse,
   ) -> Self {
-    let location = response
+    let optimized_location = response
       .headers()
       .get("location")
       .unwrap();
-
+    
     let mut url = String::new();
-
-    if location.len() > 0 {
-      url.push_str(
-        str::from_utf8(&location.as_bytes()).unwrap()
-      );
+    if !optimized_location.is_empty() {
+      let slice =
+        str::from_utf8(optimized_location.as_bytes()).unwrap();
+      url.push_str(slice);
     }
+    let bytes = self.request(Method::Get, &url, None);
+    let compressed =
+      bytes.unwrap().bytes().unwrap().to_vec();
+    self.buffer = Some(compressed);
+    self.url = Some(url);
 
-    let bytes = tinify::get_client()
-      .request(
-        Method::GET,
-        Path::new(&url),
-        None,
-      );
-
-    let compressed_buffer = bytes
-      .unwrap()
-      .bytes()
-      .unwrap()
-      .to_vec();
-
-    let mut buffer_state = BUFFER
-      .lock()
-      .expect("Could not lock mutex");
-
-    self.replace_buffer(&mut buffer_state, compressed_buffer);
-    let source = Source::new(Some(url));
-
-    source
+    self
   }
 
   pub fn result(&self) -> result::Result {
