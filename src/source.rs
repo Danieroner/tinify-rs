@@ -1,201 +1,281 @@
-use crate::result;
-use crate::tinify;
-use crate::error::TinifyResponse;
-use crate::client::Method;
-use lazy_static::lazy_static;
-use std::sync::Mutex;
+use crate::error::{self, TinifyException};
+use reqwest::blocking::Client as BlockingClient;
+use reqwest::blocking::Response as ReqwestResponse;
+use reqwest::Error as ReqwestError;
+use reqwest::StatusCode;
+use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::time::Duration;
 use std::path::Path;
+use std::fs::File;
 use std::process;
-use std::mem;
 use std::str;
-use std::io;
-use std::fs;
 
-lazy_static! {
-  static ref BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::new());
+type TinifyError = ReqwestError;
+type TinifyResponse = ReqwestResponse;
+
+const API_ENDPOINT: &str = "https://api.tinify.com";
+
+pub enum Method {
+  Post,
+  Get,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct Source {
-  pub url: Option<String>,
+  url: Option<String>,
+  key: Option<String>,
+  buffer: Option<Vec<u8>>,
 }
 
-#[allow(unused_must_use)]
 impl Source {
-  pub fn new(url: Option<String>) -> Self {
-    Self { url }
-  }
-
-  fn replace_buffer(
-    &self,
-    buffer: &mut Vec<u8>,
-    compressed_image: Vec<u8>,
-  ) {
-    mem::replace(&mut *buffer, compressed_image);
-  }
-
-  pub fn from_file(&mut self, path: &str) -> Self {
-    let route = Path::new(path);
-    if !route.exists() {
-      eprintln!("No such file or directory.");
-      process::exit(1);
+  pub fn new(
+    url: Option<String>,
+    key: Option<String>,
+  ) -> Self {
+    Self {
+      url,
+      key,
+      buffer: None,
     }
-    let buffer = fs::read(route).unwrap();
+  }
+
+  pub fn request(
+    &self,
+    method: Method,
+    url: &str,
+    buffer: Option<&[u8]>,
+  ) -> Result<TinifyResponse, TinifyError> {
+    let parse = format!("{}{}", API_ENDPOINT, url);
+    let reqwest_client = BlockingClient::new();
+    let timeout = Duration::from_secs(240);
+    let resp = match method {
+      Method::Post => {
+        let resp= reqwest_client
+          .post(parse)
+          .body(buffer.unwrap().to_owned())
+          .basic_auth("api", self.key.as_ref())
+          .timeout(timeout)
+          .send();
+
+        resp
+      },
+      Method::Get => {
+        let resp = reqwest_client
+          .get(url)
+          .timeout(timeout)
+          .send();
+
+        resp
+      },
+    };
+    if let Err(error) = resp.as_ref() {
+      if error.is_connect() {
+        eprintln!("Error processing the request.");
+        process::exit(1);
+      }
+    }
+    let request_status = resp.as_ref().unwrap().status();
+
+    match request_status {
+      StatusCode::UNAUTHORIZED => {
+        error::exit_error(
+          TinifyException::AccountException, 
+          &request_status
+        );
+      },
+      StatusCode::UNSUPPORTED_MEDIA_TYPE => {
+        error::exit_error(
+          TinifyException::ClientException, 
+          &request_status
+        );
+      },
+      StatusCode::SERVICE_UNAVAILABLE => {
+        error::exit_error(
+          TinifyException::ServerException, 
+          &request_status
+        );
+      },
+      _  => {},
+    };
     
-    self.from_buffer(buffer)
+    resp
   }
 
-  pub fn from_buffer(&self, buffer: Vec<u8>) -> Self {
-    let response = tinify::get_client()
-      .request(
-        Method::POST,
-        Path::new("/shrink"),
-        Some(&buffer),
-    );
-
-    self.get_source_from_response(response.unwrap())
+  pub fn from_file(
+    self,
+    path: &Path,
+  ) -> Result<Self, TinifyException> {
+    let location = Path::new(path);
+    if !location.exists() {
+      return Err(TinifyException::NoFileOrDirectory);
+    }
+    let file = File::open(path).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut buffer: Vec<u8> = Vec::with_capacity(reader.capacity());
+    reader.read_to_end(&mut buffer).unwrap();
+    
+    Ok(self.from_buffer(&buffer))
   }
 
-  pub fn from_url(&self, url: &str) -> Self {
-    let get_response = tinify::get_client()
-      .request(
-        Method::GET,
-        Path::new(url),
-        None,
-      );
+  pub fn from_buffer(self, buffer: &[u8]) -> Self {
+    let resp = self
+      .request(Method::Post, "/shrink", Some(buffer));
 
-    let bytes = get_response
-      .unwrap()
-      .bytes()
-      .unwrap()
-      .to_vec();
+    self.get_source_from_response(resp.unwrap())
+  }
 
-    let post_response = tinify::get_client()
-      .request(
-        Method::POST,
-        Path::new("/shrink"),
-        Some(&bytes),
-    );
+  pub fn from_url(
+    self,
+    url: &str,
+  ) -> Result<Self, TinifyException> {
+    let get_resp =
+      self.request(Method::Get, url, None);
+    let bytes =
+      get_resp.unwrap().bytes().unwrap().to_vec();
+    let post_resp = self
+      .request(Method::Post, "/shrink", Some(&bytes));
 
-    self.get_source_from_response(post_response.unwrap())
+    Ok(self.get_source_from_response(post_resp.unwrap()))
   }
 
   pub fn get_source_from_response(
-    &self,
-    response:
-    TinifyResponse
+    mut self,
+    response: TinifyResponse,
   ) -> Self {
-    let location = response
+    let optimized_location = response
       .headers()
       .get("location")
       .unwrap();
-
+    
     let mut url = String::new();
-
-    if location.len() > 0 {
-      url.push_str(
-        str::from_utf8(&location.as_bytes()).unwrap()
-      );
+    if !optimized_location.is_empty() {
+      let slice =
+        str::from_utf8(optimized_location.as_bytes()).unwrap();
+      url.push_str(slice);
     }
+    let bytes = self.request(Method::Get, &url, None);
+    let compressed =
+      bytes.unwrap().bytes().unwrap().to_vec();
+    self.buffer = Some(compressed);
+    self.url = Some(url);
 
-    let bytes = tinify::get_client()
-      .request(
-        Method::GET,
-        Path::new(&url),
-        None,
-      );
-
-    let compressed_buffer = bytes
-      .unwrap()
-      .bytes()
-      .unwrap()
-      .to_vec();
-
-    let mut buffer_state = BUFFER
-      .lock()
-      .expect("Could not lock mutex");
-
-    self.replace_buffer(&mut buffer_state, compressed_buffer);
-    let source = Source::new(Some(url));
-
-    source
-  }
-
-  pub fn result(&self) -> result::Result {
-    if self.url.as_ref().unwrap().len() == 0 {
-      eprintln!("Url is empty.");
-      process::exit(1);
-    }
-    let result = result::Result {
-      data: BUFFER.lock().unwrap(),
-    };
-
-    result
+    self
   }
 
   pub fn to_file(&self, path: &str) -> io::Result<()> {
-    self.result().to_file(&path, self.url.as_ref())
+    let file = File::create(path)?;
+    let mut reader = BufWriter::new(file);
+    reader.write_all(self.buffer.as_ref().unwrap())?;
+    reader.flush()?;
+
+    Ok(())
   }
 
   pub fn to_buffer(&self) -> Vec<u8> {
-    self.result().to_buffer()
+    self.buffer.as_ref().unwrap().to_vec()
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::mock::MockClient;
+  use dotenv::dotenv;
+  use std::env;
+  use std::fs;
 
-  lazy_static! {
-    static ref MOCK_CLIENT: MockClient = MockClient::new();
-    static ref TMP_PATH: &'static str = "./tmp_image.jpg";
+  fn get_key() -> String {
+    let key = match env::var("KEY") {
+      Ok(key) => key,
+      Err(_err) => panic!("No such file or directory."),
+    };
+
+    key
   }
 
   #[test]
-  fn test_from_file_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let source = Source::new(None).from_file(*TMP_PATH);
-    let expected = Source::new(source.url.clone());
-    
-    assert_eq!(source, expected);
+  fn test_get_request() -> Result<(), TinifyError> {
+    let source = Source::new(None, None);
+    let url = "https://tinypng.com/images/panda-happy.png";
+    let _ = source.request(Method::Get, url, None)?;
+
+    Ok(())
+  }
+  
+  #[test]
+  fn test_post_request() -> Result<(), TinifyError> {
+    dotenv().ok();
+    let key = get_key();
+    let source = Source::new(None, Some(key));
+    let path = Path::new("./tmp_image.jpg");
+    let bytes = fs::read(path).unwrap();
+    let _ = source
+      .request(Method::Post, "/shrink", Some(&bytes))?;
+
+    Ok(())
   }
 
   #[test]
-  fn test_from_buffer_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let path = Path::new(*TMP_PATH);
-    let buffer = fs::read(path).unwrap();
-    let source = Source::new(None).from_buffer(buffer);
-    let expected = Source::new(source.url.clone());
+  fn test_from_file() -> Result<(), TinifyException> {
+    dotenv().ok();
+    let key = get_key();
+    let path = Path::new("./tmp_image.jpg");
+    let source = Source::new(None, Some(key));
+    let _ = source.from_file(path)?;
 
-    assert_eq!(source, expected);
+    Ok(())
   }
 
   #[test]
-  fn test_from_url_get_source() {
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let path = "https://tinypng.com/images/panda-happy.png";
-    let source = Source::new(None).from_url(path);
-    let expected = Source::new(source.url.clone());
+  fn test_from_url() -> Result<(), TinifyException> {
+    dotenv().ok();
+    let key = get_key();
+    let url = "https://tinypng.com/images/panda-happy.png";
+    let _ = Source::new(None, Some(key)).from_url(url)?;
 
-    assert_eq!(source, expected);
+    Ok(())
   }
 
   #[test]
   fn test_get_source_from_response() {
-    let buffer = fs::read(*TMP_PATH).unwrap();
-    let url_endpoint = Path::new("/shrink");
-    tinify::set_key(MOCK_CLIENT.key.as_str());
-    let response = MOCK_CLIENT.request(
-      Method::POST, 
-      url_endpoint, 
-      Some(&buffer),
-    );
-    let source = Source::new(None)
-      .get_source_from_response(response.unwrap());
-    let expected = Source::new(source.url.clone());
-    
-    assert_eq!(source, expected);
+    let key = get_key();
+    let path = Path::new("./tmp_image.jpg");
+    let source = Source::new(None, Some(key.clone()));
+    let bytes = fs::read(path).unwrap();
+    let get_resp = source.request(Method::Post, "/shrink", Some(&bytes)).unwrap();
+    let actual = source.get_source_from_response(get_resp);
+    let mut expected = Source::new(None, Some(key.clone()));
+    expected.buffer = actual.buffer.clone();
+    expected.url = actual.url.clone();
+
+    assert_eq!(actual, expected);
+  }
+
+  #[test]
+  fn test_to_file() {
+    let key = get_key();
+    let tmp = "./tmp_image.jpg";
+    let location = "./new_image.jpg";
+    let bytes = fs::read(tmp).unwrap();
+    let mut source = Source::new(None, Some(key.clone()));
+    source.buffer = Some(bytes);
+    let _ = source.to_file(location);
+    let exists = Path::exists(Path::new(location));
+
+    assert!(exists);
+
+    if exists {
+      fs::remove_file(location).unwrap();
+    }
+  }
+
+  #[test]
+  fn test_to_buffer() {
+    let tmp = "./tmp_image.jpg";
+    let expected = fs::read(tmp).unwrap();
+    let mut source = Source::new(None, None);
+    source.buffer = Some(expected.clone());
+    let actual = source.to_buffer();
+
+    assert_eq!(actual, expected);
   }
 }

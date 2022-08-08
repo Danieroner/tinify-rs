@@ -23,7 +23,7 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "0.2.1"
+tinify-rs = "1.0.0"
 ```
 ## Usage
 
@@ -33,39 +33,53 @@ tinify-rs = "0.2.1"
 
 - Compress from a file
 ```rust
-use tinify_rs::tinify;
+use tinify::{Tinify, TinifyException};
 
-fn main() {
-  tinify::set_key("tinify api key");
-
-  let source = tinify::from_file("./unoptimized.png");
-  let compress = source.to_file("./optimized.png");
+fn main() -> Result<(), TinifyException> {
+  let key = "tinify api key";
+  let optimized = Tinify::new()
+    .set_key(key)
+    .get_client()?
+    .from_file("./unoptimized.png")?
+    .to_file("./optimized.png");
+ 
+  Ok(())
 }
 ```
 
 - Compress from an url file
 ```rust
-use tinify_rs::tinify;
+use tinify::{Tinify, TinifyException};
 
-fn main() {
-  tinify::set_key("tinify api key");
-
-  let source = tinify::from_url("https://tinypng.com/images/panda-happy.png");
-  let compress = source.to_file("./optimized.png");
+fn main() -> Result<(), TinifyException> {
+  let key = "tinify api key";
+  let optimized = Tinify::new()
+    .set_key(key)
+    .get_client()?
+    .from_url("https://tinypng.com/images/panda-happy.png")?
+    .to_file("./optimized.png");
+ 
+  Ok(())
 }
 ```
 
 - Compress from a file buffer
 ```rust
-use tinify_rs::tinify;
+use tinify::{Tinify, TinifyException};
 use std::fs;
 
-fn main() {
-  tinify::set_key("tinify api key");
-
+fn main() -> Result<(), TinifyException> {
+  let key = "tinify api key";
   let bytes = fs::read("./unoptimized.png").unwrap();
-  let buffer = tinify::from_buffer(&bytes).to_buffer();
-  let save = fs::write("./optimized.png", buffer);
+  let buffer = Tinify::new()
+    .set_key(key)
+    .get_client()?
+    .from_buffer(&bytes)?
+    .to_buffer();
+  
+  let save = fs::write("./optimized.png", buffer).unwrap();
+   
+  Ok(())
 }
 ```
 
