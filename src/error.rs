@@ -2,7 +2,10 @@ use reqwest::StatusCode;
 use std::process;
 use std::fmt;
 
+#[derive(Debug)]
 pub enum TinifyException {
+  KeyException,
+  NoFileOrDirectory,
   AccountException,
   ClientException,
   ServerException,
@@ -11,6 +14,18 @@ pub enum TinifyException {
 impl fmt::Display for TinifyException {
   fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
     match self {
+      TinifyException::KeyException => {
+        write!(
+          fmt,
+          "Provide an API key with set_key(key) method",
+        )
+      },
+      TinifyException::NoFileOrDirectory => {
+        write!(
+          fmt,
+          "No such file or directory.",
+        )
+      },
       TinifyException::AccountException => {
         write!(
           fmt,
@@ -39,7 +54,7 @@ pub fn exit_error(
 ) {
   eprintln!(
     "{} status: {}",
-    type_exception.to_string(),
+    type_exception,
     &status_code,
   );
   process::exit(1);
