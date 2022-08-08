@@ -10,6 +10,16 @@ use std::fs::File;
 use std::process;
 use std::str;
 
+type TinifyError = ReqwestError;
+type TinifyResponse = ReqwestResponse;
+
+const API_ENDPOINT: &str = "https://api.tinify.com";
+
+pub enum Method {
+  Post,
+  Get,
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Source {
   pub url: Option<String>,

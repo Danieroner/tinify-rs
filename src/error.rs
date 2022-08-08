@@ -1,19 +1,12 @@
-use reqwest::blocking::Response as ReqwestResponse;
-use reqwest::Error as ReqwestError;
 use reqwest::StatusCode;
-use std::fmt;
 use std::process;
-
-type TinifyError = ReqwestError;
-pub type TinifyResponse = ReqwestResponse;
+use std::fmt;
 
 pub enum TinifyException {
   AccountException,
   ClientException,
   ServerException,
 }
-
-pub type TinifyResult = Result<TinifyResponse, TinifyError>;
 
 impl fmt::Display for TinifyException {
   fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
