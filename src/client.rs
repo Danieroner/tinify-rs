@@ -335,7 +335,7 @@ mod tests {
       .from_url("https://tinypng.com/images/panda-happy.png")?
       .to_buffer();
 
-    fs::write("./tpm_compressed.jpg", &buffer).unwrap();
+    fs::write("./tmp_compressed.jpg", &buffer).unwrap();
     let expected = fs::read("./tmp_compressed.jpg").unwrap();
 
     assert_eq!(buffer, expected);
