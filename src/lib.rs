@@ -78,3 +78,35 @@ impl Tinify {
     Ok(client)
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use dotenv::dotenv;
+  use std::env;
+
+  #[test]
+  #[should_panic(
+    expected="Provide an API key with set_key(key) method"
+  )]
+  fn test_not_set_key() {
+    let client = Tinify::new().get_client();
+    if let Err(err) = client {
+      panic!("{}", err.to_string());
+    }
+  }
+
+  #[test]
+  fn test_get_client() -> Result<(), TinifyException> {
+    dotenv().ok();
+    let key = match env::var("KEY") {
+      Ok(key) => key,
+      Err(_err) => panic!("No such file or directory."),
+    };
+    let _ = Tinify::new()
+      .set_key(&key)
+      .get_client()?;
+
+    Ok(())
+  }
+}
