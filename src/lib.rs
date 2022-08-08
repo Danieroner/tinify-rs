@@ -7,8 +7,5 @@
 // --snip--
 
 mod error;
-mod mock;
 mod client;
-mod result;
 mod source;
-pub mod tinify;
