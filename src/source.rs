@@ -1,19 +1,14 @@
-use crate::result;
-use crate::tinify;
-use crate::error::TinifyResponse;
-use crate::client::Method;
-use lazy_static::lazy_static;
-use std::sync::Mutex;
+use crate::error::{self, TinifyException};
+use reqwest::blocking::Client as BlockingClient;
+use reqwest::blocking::Response as ReqwestResponse;
+use reqwest::Error as ReqwestError;
+use reqwest::StatusCode;
+use std::io::{self, BufReader, BufWriter, Read, Write};
+use std::time::Duration;
 use std::path::Path;
+use std::fs::File;
 use std::process;
-use std::mem;
 use std::str;
-use std::io;
-use std::fs;
-
-lazy_static! {
-  static ref BUFFER: Mutex<Vec<u8>> = Mutex::new(Vec::new());
-}
 
 #[derive(Debug, PartialEq)]
 pub struct Source {
