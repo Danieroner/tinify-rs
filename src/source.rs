@@ -39,6 +39,68 @@ impl Source {
     }
   }
 
+  pub fn request(
+    &self,
+    method: Method,
+    url: &str,
+    buffer: Option<&[u8]>,
+  ) -> Result<TinifyResponse, TinifyError> {
+    let parse = format!("{}{}", API_ENDPOINT, url);
+    let reqwest_client = BlockingClient::new();
+    let timeout = Duration::from_secs(240);
+    let resp = match method {
+      Method::Post => {
+        let resp= reqwest_client
+          .post(parse)
+          .body(buffer.unwrap().to_owned())
+          .basic_auth("api", self.key.as_ref())
+          .timeout(timeout)
+          .send();
+
+        resp
+      },
+      Method::Get => {
+        let resp = reqwest_client
+          .get(url)
+          .timeout(timeout)
+          .send();
+
+        resp
+      },
+    };
+    if let Err(error) = resp.as_ref() {
+      if error.is_connect() {
+        eprintln!("Error processing the request.");
+        process::exit(1);
+      }
+    }
+    let request_status = resp.as_ref().unwrap().status();
+
+    match request_status {
+      StatusCode::UNAUTHORIZED => {
+        error::exit_error(
+          TinifyException::AccountException, 
+          &request_status
+        );
+      },
+      StatusCode::UNSUPPORTED_MEDIA_TYPE => {
+        error::exit_error(
+          TinifyException::ClientException, 
+          &request_status
+        );
+      },
+      StatusCode::SERVICE_UNAVAILABLE => {
+        error::exit_error(
+          TinifyException::ServerException, 
+          &request_status
+        );
+      },
+      _  => {},
+    };
+    
+    resp
+  }
+
   pub fn from_file(&mut self, path: &str) -> Self {
     let route = Path::new(path);
     if !route.exists() {
