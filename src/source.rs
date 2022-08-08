@@ -124,28 +124,18 @@ impl Source {
     self.get_source_from_response(resp.unwrap())
   }
 
-  pub fn from_url(&self, url: &str) -> Self {
-    let get_response = tinify::get_client()
-      .request(
-        Method::GET,
-        Path::new(url),
-        None,
-      );
+  pub fn from_url(
+    self,
+    url: &str,
+  ) -> Result<Self, TinifyException> {
+    let get_resp =
+      self.request(Method::Get, url, None);
+    let bytes =
+      get_resp.unwrap().bytes().unwrap().to_vec();
+    let post_resp = self
+      .request(Method::Post, "/shrink", Some(&bytes));
 
-    let bytes = get_response
-      .unwrap()
-      .bytes()
-      .unwrap()
-      .to_vec();
-
-    let post_response = tinify::get_client()
-      .request(
-        Method::POST,
-        Path::new("/shrink"),
-        Some(&bytes),
-    );
-
-    self.get_source_from_response(post_response.unwrap())
+    Ok(self.get_source_from_response(post_resp.unwrap()))
   }
 
   pub fn get_source_from_response(
