@@ -1,17 +1,6 @@
-use crate::error;
-use crate::error::{TinifyException, TinifyResult};
-use reqwest::blocking::Client as BlockingClient;
-use reqwest::StatusCode;
-use std::time::Duration;
+use crate::TinifyException;
+use crate::source::Source;
 use std::path::Path;
-use std::process;
-
-const API_ENDPOINT: &str = "https://api.tinify.com";
-
-pub enum Method {
-  POST,
-  GET,
-}
 
 #[derive(Debug, PartialEq)]
 pub struct Client {
