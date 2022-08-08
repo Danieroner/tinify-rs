@@ -221,6 +221,7 @@ mod tests {
     let path = Path::new("./tmp_image.jpg");
     let source = Source::new(None, Some(key));
     let _ = source.from_file(path)?;
+
     Ok(())
   }
 
@@ -230,6 +231,7 @@ mod tests {
     let key = get_key();
     let url = "https://tinypng.com/images/panda-happy.png";
     let _ = Source::new(None, Some(key)).from_url(url)?;
+
     Ok(())
   }
 
