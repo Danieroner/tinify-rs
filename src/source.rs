@@ -28,16 +28,15 @@ pub struct Source {
 }
 
 impl Source {
-  pub fn new(url: Option<String>) -> Self {
-    Self { url }
-  }
-
-  fn replace_buffer(
-    &self,
-    buffer: &mut Vec<u8>,
-    compressed_image: Vec<u8>,
-  ) {
-    mem::replace(&mut *buffer, compressed_image);
+  pub fn new(
+    url: Option<String>,
+    key: Option<String>,
+  ) -> Self {
+    Self {
+      url,
+      key,
+      buffer: None,
+    }
   }
 
   pub fn from_file(&mut self, path: &str) -> Self {
