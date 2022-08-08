@@ -22,10 +22,11 @@ pub enum Method {
 
 #[derive(Debug, PartialEq)]
 pub struct Source {
-  pub url: Option<String>,
+  url: Option<String>,
+  key: Option<String>,
+  buffer: Option<Vec<u8>>,
 }
 
-#[allow(unused_must_use)]
 impl Source {
   pub fn new(url: Option<String>) -> Self {
     Self { url }
