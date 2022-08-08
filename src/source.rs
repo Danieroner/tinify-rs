@@ -101,15 +101,20 @@ impl Source {
     resp
   }
 
-  pub fn from_file(&mut self, path: &str) -> Self {
-    let route = Path::new(path);
-    if !route.exists() {
-      eprintln!("No such file or directory.");
-      process::exit(1);
+  pub fn from_file(
+    self,
+    path: &Path,
+  ) -> Result<Self, TinifyException> {
+    let location = Path::new(path);
+    if !location.exists() {
+      return Err(TinifyException::NoFileOrDirectory);
     }
-    let buffer = fs::read(route).unwrap();
+    let file = File::open(path).unwrap();
+    let mut reader = BufReader::new(file);
+    let mut buffer: Vec<u8> = Vec::with_capacity(reader.capacity());
+    reader.read_to_end(&mut buffer).unwrap();
     
-    self.from_buffer(buffer)
+    Ok(self.from_buffer(&buffer))
   }
 
   pub fn from_buffer(&self, buffer: Vec<u8>) -> Self {
