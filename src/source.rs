@@ -20,7 +20,7 @@ pub enum Method {
   Get,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Source {
   url: Option<String>,
   key: Option<String>,
@@ -28,10 +28,7 @@ pub struct Source {
 }
 
 impl Source {
-  pub fn new(
-    url: Option<String>,
-    key: Option<String>,
-  ) -> Self {
+  pub fn new(url: Option<String>, key: Option<String>) -> Self {
     Self {
       url,
       key,
@@ -45,36 +42,32 @@ impl Source {
     url: &str,
     buffer: Option<&[u8]>,
   ) -> Result<TinifyResponse, TinifyError> {
-    let parse = format!("{}{}", API_ENDPOINT, url);
+    let full_url = format!("{}{}", API_ENDPOINT, url);
     let reqwest_client = BlockingClient::new();
     let timeout = Duration::from_secs(240);
-    let resp = match method {
+    let response = match method {
       Method::Post => {
-        let resp= reqwest_client
-          .post(parse)
+        reqwest_client
+          .post(full_url)
           .body(buffer.unwrap().to_owned())
           .basic_auth("api", self.key.as_ref())
           .timeout(timeout)
-          .send();
-
-        resp
+          .send()
       },
       Method::Get => {
-        let resp = reqwest_client
+        reqwest_client
           .get(url)
           .timeout(timeout)
-          .send();
-
-        resp
+          .send()
       },
     };
-    if let Err(error) = resp.as_ref() {
+    if let Err(error) = response.as_ref() {
       if error.is_connect() {
         eprintln!("Error processing the request.");
         process::exit(1);
       }
     }
-    let request_status = resp.as_ref().unwrap().status();
+    let request_status = response.as_ref().unwrap().status();
 
     match request_status {
       StatusCode::UNAUTHORIZED => {
@@ -98,13 +91,10 @@ impl Source {
       _  => {},
     };
     
-    resp
+    response
   }
 
-  pub fn from_file(
-    self,
-    path: &Path,
-  ) -> Result<Self, TinifyException> {
+  pub fn from_file(self, path: &Path) -> Result<Self, TinifyException> {
     let location = Path::new(path);
     if !location.exists() {
       return Err(TinifyException::NoFileOrDirectory);
@@ -118,48 +108,40 @@ impl Source {
   }
 
   pub fn from_buffer(self, buffer: &[u8]) -> Self {
-    let resp = self
-      .request(Method::Post, "/shrink", Some(buffer));
+    let response =
+      self.request(Method::Post, "/shrink", Some(buffer));
 
-    self.get_source_from_response(resp.unwrap())
+    self.get_source_from_response(response.unwrap())
   }
 
-  pub fn from_url(
-    self,
-    url: &str,
-  ) -> Result<Self, TinifyException> {
-    let get_resp =
-      self.request(Method::Get, url, None);
-    let bytes =
-      get_resp.unwrap().bytes().unwrap().to_vec();
-    let post_resp = self
-      .request(Method::Post, "/shrink", Some(&bytes));
+  pub fn from_url(self, url: &str) -> Result<Self, TinifyException> {
+    let get = self.request(Method::Get, url, None);
+    let bytes = get.unwrap().bytes().unwrap().to_vec();
+    let post = self.request(Method::Post, "/shrink", Some(&bytes));
 
-    Ok(self.get_source_from_response(post_resp.unwrap()))
+    Ok(self.get_source_from_response(post.unwrap()))
   }
 
   pub fn get_source_from_response(
     mut self,
     response: TinifyResponse,
   ) -> Self {
-    let optimized_location = response
-      .headers()
-      .get("location")
-      .unwrap();
-    
+    let optimized_location =
+      response.headers().get("location").unwrap();
     let mut url = String::new();
+
     if !optimized_location.is_empty() {
       let slice =
         str::from_utf8(optimized_location.as_bytes()).unwrap();
       url.push_str(slice);
     }
-    let bytes = self.request(Method::Get, &url, None);
-    let compressed =
-      bytes.unwrap().bytes().unwrap().to_vec();
-    self.buffer = Some(compressed);
+    
+    let get = self.request(Method::Get, &url, None);
+    let bytes = get.unwrap().bytes().unwrap().to_vec();
+    self.buffer = Some(bytes);
     self.url = Some(url);
 
-    self
+    self  
   }
 
   pub fn to_file(&self, path: &str) -> io::Result<()> {
@@ -241,8 +223,8 @@ mod tests {
     let path = Path::new("./tmp_image.jpg");
     let source = Source::new(None, Some(key.clone()));
     let bytes = fs::read(path).unwrap();
-    let get_resp = source.request(Method::Post, "/shrink", Some(&bytes)).unwrap();
-    let actual = source.get_source_from_response(get_resp);
+    let get = source.request(Method::Post, "/shrink", Some(&bytes)).unwrap();
+    let actual = source.get_source_from_response(get);
     let mut expected = Source::new(None, Some(key.clone()));
     expected.buffer = actual.buffer.clone();
     expected.url = actual.url.clone();
