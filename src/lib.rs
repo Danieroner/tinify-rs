@@ -61,7 +61,7 @@ impl Tinify {
   /// ```
   /// use tinify::{Tinify, TinifyException};
   /// 
-  /// fn main() -> Result<(), :TinifyException> {
+  /// fn main() -> Result<(), TinifyException> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
   ///   let client = tinify.get_client()?;

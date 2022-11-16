@@ -11,11 +11,11 @@ impl Client {
   pub fn new(key: String) -> Self {
     Self { key }
   }
-  
+
   fn get_source(&self) -> Source {
     Source::new(None, Some(self.key.clone())) 
   }
-  
+
   /// Choose a file to compress.
   ///
   /// # Examples
@@ -39,13 +39,11 @@ impl Client {
     path: &str,
   ) -> Result<Source, TinifyException> {
     let path = Path::new(path);
-    let source = self
+    self
       .get_source()
-      .from_file(path);
-  
-    source
+      .from_file(path)
   }
-  
+
   /// Choose a buffer to compress.
   ///
   /// # Examples
@@ -72,13 +70,9 @@ impl Client {
     &self,
     buffer: &[u8],
   ) -> Result<Source, TinifyException> {
-    let source = self
-      .get_source()
-      .from_buffer(buffer);
-  
-    Ok(source)
+    Ok(self.get_source().from_buffer(buffer))
   }
-  
+
   /// Choose an url file to compress.
   ///
   /// # Examples
@@ -102,10 +96,9 @@ impl Client {
     &self,
     url: &str,
   ) -> Result<Source, TinifyException> {
-    let source = Source::new(None, Some(self.key.clone()))
-      .from_url(url);
-  
-    source
+    self
+      .get_source()
+      .from_url(url)
   }
 }
 
@@ -242,7 +235,8 @@ mod tests {
       .from_buffer(&uncompress)?
       .to_file("./tmp_compressed.jpg");
 
-    let compress_size = fs::metadata("./tmp_compressed.jpg").unwrap().len();
+    let compress_size =
+      fs::metadata("./tmp_compressed.jpg").unwrap().len();
 
     assert_eq!(uncompress_size, 124814);
     assert_eq!(compress_size, 102051);
@@ -268,12 +262,11 @@ mod tests {
     let path = Path::new("./tmp_image.jpg");
     let uncompress = fs::read(path).unwrap();
 
-    let buffer = client
-      .from_buffer(&uncompress)?
-      .to_buffer();
+    let buffer =
+      client.from_buffer(&uncompress)?.to_buffer();
 
-    fs::write("./tpm_compressed.jpg", &buffer).unwrap();
-    let expected = fs::read("./tpm_compressed.jpg").unwrap();
+    fs::write("./tmp_compressed.jpg", &buffer).unwrap();
+    let expected = fs::read("./tmp_compressed.jpg").unwrap();
 
     assert_eq!(buffer, expected);
 
@@ -284,7 +277,6 @@ mod tests {
       fs::remove_file(path).unwrap();
     }
 
-
     Ok(())
   }
 
@@ -292,18 +284,18 @@ mod tests {
   fn test_compressed_from_url_to_file() -> Result<(), TinifyException> {
     dotenv().ok();
     let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
+    let client = Tinify::new().set_key(&key).get_client()?;
 
-    let uncompress_size = BlockingClient::new()
+    let uncompress_size =
+      BlockingClient::new()
       .get("https://tinypng.com/images/panda-happy.png")
       .send()
       .unwrap()
       .content_length()
       .unwrap();
 
-    let _ = client
+    let _ =
+      client
       .from_url("https://tinypng.com/images/panda-happy.png")?
       .to_file("./tmp_compressed.jpg");
    
