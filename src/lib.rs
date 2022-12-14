@@ -52,8 +52,14 @@ impl Tinify {
   ///   let tinify = Tinify::new().set_key(key);
   /// }
   /// ```
-  pub fn set_key(mut self, key: &str) -> Self {
-    self.key = key.to_string();
+  pub fn set_key<K>(
+    mut self,
+    key: K,
+  ) -> Self
+  where
+    K: AsRef<str> + Into<String>,
+  {
+    self.key = key.into();
     self
   }
 
