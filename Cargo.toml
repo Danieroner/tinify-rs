@@ -1,6 +1,6 @@
 [package]
 name = "tinify-rs"
-version = "1.0.1"
+version = "1.1.0"
 edition = "2021"
 description = "A Rust client for the Tinify API"
 authors = ["The tinify-rs Developers"]
@@ -9,19 +9,19 @@ readme = "README.md"
 documentation = "https://docs.rs/tinify-rs"
 repository = "https://github.com/Danieroner/tinify-rs"
 homepage = "https://github.com/Danieroner/tinify-rs"
-keywords = [
-  "tinify", 
-  "tinypng", 
-  "tinyjpg", 
-  "compress", 
-  "optimize", 
-]
+keywords = ["tinify", "tinypng", "tinyjpg", "compress", "optimize"]
+categories = ["compression", "multimedia::images"]
 
 [dependencies]
-reqwest = { version = "0.11.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11.11", features = ["blocking"] }
+serde = { version = "1.0.149", default-features = false, features = ["derive"] }
+serde_json = { version = "1.0.89", default-features = false, features = ["alloc"] }
+serde_derive = "1.0.149"
 
 [dev-dependencies]
 dotenv = "0.15.0"
+imagesize = "0.10.1"
+assert_matches = "1.5.0"
 
 [lib]
 name = "tinify"

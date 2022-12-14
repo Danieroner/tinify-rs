@@ -9,28 +9,22 @@
 mod error;
 mod client;
 mod source;
+mod resize;
 
 pub use crate::client::Client;
 pub use crate::source::Source;
-pub use crate::error::TinifyException;
+pub use crate::resize::Resize;
+pub use crate::resize::ResizeMethod;
+pub use crate::error::TinifyError;
 
-#[derive(Debug)]
+/// Use the API to create a new client.
+#[derive(Default)]
 pub struct Tinify {
   pub key: String,
 }
 
 impl Tinify {
   /// Create a new Tinify Object.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use tinify::Tinify;
-  /// 
-  /// fn main() {
-  ///   let tinify = Tinify::new();
-  /// }
-  /// ```
   pub fn new() -> Self {
     Self {
       key: String::new(),
@@ -38,19 +32,14 @@ impl Tinify {
   }
   
   /// Set a Tinify Key.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use tinify::Tinify;
-  /// 
-  /// fn main() {
-  ///   let key = "tinify api key";
-  ///   let tinify = Tinify::new().set_key(key);
-  /// }
-  /// ```
-  pub fn set_key(mut self, key: &str) -> Self {
-    self.key = key.to_string();
+  pub fn set_key<K>(
+    mut self,
+    key: K,
+  ) -> Self
+  where
+    K: AsRef<str> + Into<String>,
+  {
+    self.key = key.into();
     self
   }
 
@@ -59,21 +48,19 @@ impl Tinify {
   /// # Examples
   ///
   /// ```
-  /// use tinify::{Tinify, TinifyException};
+  /// use tinify::Tinify;
+  /// use tinify::TinifyError;
   /// 
-  /// fn main() -> Result<(), TinifyException> {
+  /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
   ///   let client = tinify.get_client()?;
-  ///   
+  /// 
   ///   Ok(())
   /// }
   /// ```
-  pub fn get_client(&self) -> Result<Client, TinifyException> {
-    if self.key.is_empty() {
-      return Err(TinifyException::KeyException);
-    }
-    let client = Client::new(self.key.to_string());
+  pub fn get_client(&self) -> Result<Client, TinifyError> {
+    let client = Client::new(self.key.as_str());
   
     Ok(client)
   }
@@ -86,18 +73,7 @@ mod tests {
   use std::env;
 
   #[test]
-  #[should_panic(
-    expected="Provide an API key with set_key(key) method"
-  )]
-  fn test_not_set_key() {
-    let client = Tinify::new().get_client();
-    if let Err(err) = client {
-      panic!("{}", err.to_string());
-    }
-  }
-
-  #[test]
-  fn test_get_client() -> Result<(), TinifyException> {
+  fn test_get_client() -> Result<(), TinifyError> {
     dotenv().ok();
     let key = match env::var("KEY") {
       Ok(key) => key,

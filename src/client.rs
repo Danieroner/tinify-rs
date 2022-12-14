@@ -1,19 +1,24 @@
-use crate::TinifyException;
+use crate::error::TinifyError;
 use crate::source::Source;
 use std::path::Path;
 
-#[derive(Debug)]
+/// The Tinify Client.
 pub struct Client {
-  pub key: String,
+  key: String,
 }
 
 impl Client {
-  pub fn new(key: String) -> Self {
-    Self { key }
+  pub(crate) fn new<K>(key: K) -> Self
+  where
+    K: AsRef<str> + Into<String>,
+  {
+    Self { 
+      key: key.into(),
+    }
   }
 
   fn get_source(&self) -> Source {
-    Source::new(None, Some(self.key.clone())) 
+    Source::new(None, Some(self.key.as_str())) 
   }
 
   /// Choose a file to compress.
@@ -21,24 +26,27 @@ impl Client {
   /// # Examples
   ///
   /// ```
-  /// use tinify::{Tinify, TinifyException};
+  /// use tinify::Tinify;
+  /// use tinify::TinifyError;
   /// 
-  /// fn main() -> Result<(), TinifyException> {
+  /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
-  ///   let optimized = Tinify::new()
-  ///     .set_key(key)
-  ///     .get_client()?
-  ///     .from_file("./unoptimized.png")?
-  ///     .to_file("./optimized.png");
+  ///   let tinify = Tinify::new().set_key(key);
+  ///   let client = tinify.get_client()?;
+  ///   let _ = client
+  ///     .from_file("./unoptimized.jpg")?
+  ///     .to_file("./optimized.jpg")?;
   ///   
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_file(
+  pub fn from_file<P>(
     &self,
-    path: &str,
-  ) -> Result<Source, TinifyException> {
-    let path = Path::new(path);
+    path: P,
+  ) -> Result<Source, TinifyError>
+  where
+    P: AsRef<Path>,
+  {
     self
       .get_source()
       .from_file(path)
@@ -49,19 +57,18 @@ impl Client {
   /// # Examples
   ///
   /// ```
-  /// use tinify::{Tinify, TinifyException};
+  /// use tinify::Tinify;
+  /// use tinify::TinifyError;
   /// use std::fs;
   /// 
-  /// fn main() -> Result<(), TinifyException> {
+  /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
-  ///   let bytes = fs::read("./unoptimized.png").unwrap();
-  ///   let buffer = Tinify::new()
-  ///     .set_key(key)
-  ///     .get_client()?
+  ///   let tinify = Tinify::new().set_key(key);
+  ///   let client = tinify.get_client()?;
+  ///   let bytes = fs::read("./unoptimized.jpg")?;
+  ///   let _ = client
   ///     .from_buffer(&bytes)?
-  ///     .to_buffer();
-  ///  
-  ///   let save = fs::write("./optimized.png", buffer).unwrap();
+  ///     .to_file("./optimized.jpg")?;
   ///   
   ///   Ok(())
   /// }
@@ -69,33 +76,38 @@ impl Client {
   pub fn from_buffer(
     &self,
     buffer: &[u8],
-  ) -> Result<Source, TinifyException> {
-    Ok(self.get_source().from_buffer(buffer))
+  ) -> Result<Source, TinifyError> {
+    self
+      .get_source()
+      .from_buffer(buffer)
   }
 
-  /// Choose an url file to compress.
+  /// Choose an url image to compress.
   ///
   /// # Examples
   ///
   /// ```
-  /// use tinify::{Tinify, TinifyException};
+  /// use tinify::Tinify;
+  /// use tinify::TinifyError;
   /// 
-  /// fn main() -> Result<(), TinifyException> {
+  /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
-  ///   let optimized = Tinify::new()
-  ///     .set_key(key)
-  ///     .get_client()?
+  ///   let tinify = Tinify::new().set_key(key);
+  ///   let client = tinify.get_client()?;
+  ///   let _ = client
   ///     .from_url("https://tinypng.com/images/panda-happy.png")?
-  ///     .to_file("./optimized.png");
-  /// 
+  ///     .to_file("./optimized.png")?;
   ///   
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_url(
+  pub fn from_url<P>(
     &self,
-    url: &str,
-  ) -> Result<Source, TinifyException> {
+    url: P,
+  ) -> Result<Source, TinifyError>
+  where
+    P: AsRef<str>,
+  {
     self
       .get_source()
       .from_url(url)
@@ -105,15 +117,18 @@ impl Client {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::Tinify;
-  use crate::source::Source;
-  use reqwest::blocking::Client as BlockingClient; 
+  use crate::resize::ResizeMethod;
+  use crate::resize::Resize;
+  use crate::TinifyError;
+  use reqwest::blocking::Client as ReqwestClient;
+  use assert_matches::assert_matches;
+  use imagesize::size;
   use dotenv::dotenv;
-  use std::default::Default;
   use std::env;
   use std::fs;
 
   fn get_key() -> String {
+    dotenv().ok();
     let key = match env::var("KEY") {
       Ok(key) => key,
       Err(_err) => panic!("No such file or directory."),
@@ -123,220 +138,226 @@ mod tests {
   }
 
   #[test]
-  fn test_get_source() {
-    let actual = Client::new(String::new())
-      .get_source();
-    let expected =
-      Source::new(Default::default(), Some(String::new()));
+  fn test_invalid_key() {
+    let client = Client::new("invalid");
+    let request = client
+      .from_url("https://tinypng.com/images/panda-happy.png")
+      .unwrap_err();
 
-    assert_eq!(actual, expected);
+    assert_matches!(request, TinifyError::ClientError);
   }
 
   #[test]
-  fn test_from_file() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_compress_from_file() -> Result<(), TinifyError> {
     let key = get_key();
-    let _ = Client::new(key).from_file("./tmp_image.jpg")?;
-  
-    Ok(())
-  }
+    let output = Path::new("./optimized.jpg");
+    let tmp_image = Path::new("./tmp_image.jpg");
+    let client = Client::new(key);
+    let _ = client.from_file(tmp_image)?.to_file(output)?;
+    let actual = fs::metadata(tmp_image)?.len();
+    let expected = fs::metadata(output)?.len();
 
-  #[test]
-  fn test_from_buffer() -> Result<(), TinifyException> {
-    dotenv().ok();
-    let key = get_key();
-    let buffer = fs::read("./tmp_image.jpg").unwrap();
-    let _ = Client::new(key).from_buffer(&buffer)?;
-  
-    Ok(())
-  }
+    assert_eq!(actual, 124814);
+    assert_eq!(expected, 102051);
 
-  #[test]
-  fn test_from_url() -> Result<(), TinifyException> {
-    dotenv().ok();
-    let key = get_key();
-    let url = "https://tinypng.com/images/panda-happy.png";
-    let _ = Client::new(key).from_url(url)?;
-  
-    Ok(())
-  }
-
-  #[test]
-  fn test_compressed_from_file_to_file() -> Result<(), TinifyException>  {
-    dotenv().ok();
-    let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
-
-    let _ = client
-      .from_file("./tmp_image.jpg")?
-      .to_file("./tmp_compressed.jpg")
-      .unwrap();
-    
-    let uncompress_size =
-      fs::metadata("./tmp_image.jpg").unwrap().len();
-
-    let path = Path::new("./tmp_compressed.jpg");
-    let compress_size =
-      fs::metadata("./tmp_compressed.jpg").unwrap().len();
-    let exists = Path::exists(path);
-
-    assert_eq!(uncompress_size, 124814);
-    assert_eq!(compress_size, 102051);
-
-    if exists {
-      fs::remove_file(path).unwrap();
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())
   }
 
   #[test]
-  fn test_compressed_from_file_to_buffer() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_compress_from_buffer() -> Result<(), TinifyError> {
     let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
+    let output = Path::new("./optimized.jpg");
+    let tmp_image = Path::new("./tmp_image.jpg");
+    let buffer = fs::read(tmp_image).unwrap();
+    let client = Client::new(key);
+    let _ = client.from_buffer(&buffer)?.to_file(output)?;
+    let actual = fs::metadata(tmp_image)?.len();
+    let expected = fs::metadata(output)?.len();
 
-    let buffer = client
-      .from_file("./tmp_image.jpg")?
-      .to_buffer();
+    assert_eq!(actual, 124814);
+    assert_eq!(expected, 102051);
 
-    let path = Path::new("./tmp_compressed.jpg");
-    fs::write(path, &buffer).unwrap();
-
-    let expected = fs::read(path).unwrap();
-    let exists = Path::exists(path);
-
-    assert_eq!(buffer, expected);
-
-    if exists {
-      fs::remove_file(path).unwrap();
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())
   }
 
   #[test]
-  fn test_compressed_from_buffer_to_file() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_compress_from_url() -> Result<(), TinifyError> {
     let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
+    let output = Path::new("./optimized.jpg");
+    let remote_image = "https://tinypng.com/images/panda-happy.png";
+    let client = Client::new(key);
+    let _ = client.from_url(remote_image)?.to_file(output)?;
+    let expected = fs::metadata(output)?.len();
 
-    let path = Path::new("./tmp_image.jpg");
-    let uncompress = fs::read(path).unwrap();
-    let uncompress_size = fs::metadata(path).unwrap().len();
+    let actual = ReqwestClient::new()
+      .get(remote_image)
+      .send()?;
 
-    let _ = client
-      .from_buffer(&uncompress)?
-      .to_file("./tmp_compressed.jpg");
+    if let Some(content_length) = actual.content_length() {
+      assert_eq!(content_length, 30734);
+    }
 
-    let compress_size =
-      fs::metadata("./tmp_compressed.jpg").unwrap().len();
+    assert_eq!(expected, 26324);
 
-    assert_eq!(uncompress_size, 124814);
-    assert_eq!(compress_size, 102051);
-
-    let path = Path::new("./tmp_compressed.jpg");
-    let exists = Path::exists(path);
-
-    if exists {
-      fs::remove_file(path).unwrap();
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())
   }
 
   #[test]
-  fn test_compressed_from_buffer_to_buffer() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_save_to_file() -> Result<(), TinifyError> {
     let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
+    let output = Path::new("./optimized.jpg");
+    let tmp_image = Path::new("./tmp_image.jpg");
+    let client = Client::new(key);
+    let _ = client.from_file(tmp_image)?.to_file(output)?;
 
-    let path = Path::new("./tmp_image.jpg");
-    let uncompress = fs::read(path).unwrap();
+    assert!(output.exists());
 
-    let buffer =
-      client.from_buffer(&uncompress)?.to_buffer();
-
-    fs::write("./tmp_compressed.jpg", &buffer).unwrap();
-    let expected = fs::read("./tmp_compressed.jpg").unwrap();
-
-    assert_eq!(buffer, expected);
-
-    let path = Path::new("./tmp_compressed.jpg");
-    let exists = Path::exists(path);
-
-    if exists {
-      fs::remove_file(path).unwrap();
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())
   }
 
   #[test]
-  fn test_compressed_from_url_to_file() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_save_to_bufffer() -> Result<(), TinifyError> {
     let key = get_key();
-    let client = Tinify::new().set_key(&key).get_client()?;
+    let output = Path::new("./optimized.jpg");
+    let tmp_image = Path::new("./tmp_image.jpg");
+    let client = Client::new(key);
+    let buffer = client.from_file(tmp_image)?.to_buffer();
 
-    let uncompress_size =
-      BlockingClient::new()
-      .get("https://tinypng.com/images/panda-happy.png")
-      .send()
-      .unwrap()
-      .content_length()
-      .unwrap();
+    assert_eq!(buffer.capacity(), 102051);
 
-    let _ =
-      client
-      .from_url("https://tinypng.com/images/panda-happy.png")?
-      .to_file("./tmp_compressed.jpg");
-   
-    let compress_size =
-      fs::metadata("./tmp_compressed.jpg").unwrap().len();
-  
-    assert_eq!(uncompress_size, 30734);
-    assert_eq!(compress_size, 26324);
-
-    let path = Path::new("./tmp_compressed.jpg");
-    let exists = Path::exists(path);
-
-    if exists {
-      fs::remove_file(path).unwrap();
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())
   }
 
   #[test]
-  fn test_compressed_from_url_to_buffer() -> Result<(), TinifyException> {
-    dotenv().ok();
+  fn test_resize_scale_width() -> Result<(), TinifyError> {
     let key = get_key();
-    let client = Tinify::new()
-      .set_key(&key)
-      .get_client()?;
-    
-    let buffer = client
-      .from_url("https://tinypng.com/images/panda-happy.png")?
-      .to_buffer();
+    let output = Path::new("./tmp_resized.jpg");
+    let _ = Client::new(key)
+      .from_file("./tmp_image.jpg".to_string())?
+      .resize(Resize::new(ResizeMethod::SCALE, Some(400), None))?
+      .to_file(output)?;
 
-    fs::write("./tmp_compressed.jpg", &buffer).unwrap();
-    let expected = fs::read("./tmp_compressed.jpg").unwrap();
+    let (width, height) = match size(output) {
+      Ok(dim) => (dim.width, dim.height),
+      Err(err) => panic!("Error getting dimensions: {:?}", err),
+    };
 
-    assert_eq!(buffer, expected);
+    assert_eq!((width, height), (400, 200));
 
-    let path = Path::new("./tmp_compressed.jpg");
-    let exists = Path::exists(path);
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
 
-    if exists {
-      fs::remove_file(path).unwrap();
+    Ok(())
+  }
+
+  #[test]
+  fn test_resize_scale_height() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./tmp_resized.jpg");
+    let _ = Client::new(key)
+      .from_file("./tmp_image.jpg".to_string())?
+      .resize(Resize::new(ResizeMethod::SCALE, None, Some(400)))?
+      .to_file(output)?;
+
+    let (width, height) = match size(output) {
+      Ok(dim) => (dim.width, dim.height),
+      Err(err) => panic!("Error getting dimensions: {:?}", err),
+    };
+
+    assert_eq!((width, height), (800, 400));
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_resize_fit() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./tmp_resized.jpg");
+    let _ = Client::new(key)
+      .from_file("./tmp_image.jpg".to_string())?
+      .resize(Resize::new(ResizeMethod::FIT, Some(400), Some(200)))?
+      .to_file(output)?;
+
+    let (width, height) = match size(output) {
+      Ok(dim) => (dim.width, dim.height),
+      Err(err) => panic!("Error getting dimensions: {:?}", err),
+    };
+
+    assert_eq!((width, height), (400, 200));
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_resize_cover() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./tmp_resized.jpg");
+    let _ = Client::new(key)
+      .from_file("./tmp_image.jpg".to_string())?
+      .resize(Resize::new(ResizeMethod::COVER, Some(400), Some(200)))?
+      .to_file(output)?;
+
+    let (width, height) = match size(output) {
+      Ok(dim) => (dim.width, dim.height),
+      Err(err) => panic!("Error getting dimensions: {:?}", err),
+    };
+
+    assert_eq!((width, height), (400, 200));
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_resize_thumb() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./tmp_resized.jpg");
+    let _ = Client::new(key)
+      .from_file("./tmp_image.jpg".to_string())?
+      .resize(Resize::new(ResizeMethod::THUMB, Some(400), Some(200)))?
+      .to_file(output)?;
+
+    let (width, height) = match size(output) {
+      Ok(dim) => (dim.width, dim.height),
+      Err(err) => panic!("Error getting dimensions: {:?}", err),
+    };
+
+    assert_eq!((width, height), (400, 200));
+
+    if output.exists() {
+      fs::remove_file(output)?;
     }
 
     Ok(())

@@ -23,7 +23,7 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "1.0.1"
+tinify-rs = "1.1.0"
 ```
 ## Usage
 
@@ -33,52 +33,85 @@ tinify-rs = "1.0.1"
 
 - Compress from a file
 ```rust
-use tinify::{Tinify, TinifyException};
+use tinify::Tinify;
+use tinify::TinifyError;
 
-fn main() -> Result<(), TinifyException> {
+fn main() -> Result<(), TinifyError> {
   let key = "tinify api key";
-  let optimized = Tinify::new()
-    .set_key(key)
-    .get_client()?
-    .from_file("./unoptimized.png")?
-    .to_file("./optimized.png");
- 
+  let tinify = Tinify::new().set_key(key);
+  let client = tinify.get_client()?;
+  let _ = client
+    .from_file("./unoptimized.jpg")?
+    .to_file("./optimized.jpg")?;
+    
   Ok(())
 }
 ```
 
-- Compress from an url file
+- Compress from an url
 ```rust
-use tinify::{Tinify, TinifyException};
+use tinify::Tinify;
+use tinify::TinifyError;
 
-fn main() -> Result<(), TinifyException> {
+fn main() -> Result<(), TinifyError> {
   let key = "tinify api key";
-  let optimized = Tinify::new()
-    .set_key(key)
-    .get_client()?
+  let tinify = Tinify::new().set_key(key);
+  let client = tinify.get_client()?;
+  let _ = client
     .from_url("https://tinypng.com/images/panda-happy.png")?
-    .to_file("./optimized.png");
- 
+    .to_file("./optimized.png")?;
+    
   Ok(())
 }
 ```
 
-- Compress from a file buffer
+- Compress from a buffer
 ```rust
-use tinify::{Tinify, TinifyException};
+use tinify::Tinify;
+use tinify::TinifyError;
 use std::fs;
 
-fn main() -> Result<(), TinifyException> {
+fn main() -> Result<(), TinifyError> {
   let key = "tinify api key";
-  let bytes = fs::read("./unoptimized.png").unwrap();
-  let buffer = Tinify::new()
-    .set_key(key)
-    .get_client()?
+  let tinify = Tinify::new().set_key(key);
+  let client = tinify.get_client()?;
+  let bytes = fs::read("./unoptimized.jpg")?;
+  let _ = client
     .from_buffer(&bytes)?
-    .to_buffer();
-  
-  let save = fs::write("./optimized.png", buffer).unwrap();
-   
+    .to_file("./optimized.jpg")?;
+     
+  Ok(())
+}
+```
+
+- Resize a compressed image.
+```rust
+use tinify::Tinify;
+use tinify::Client;
+use tinify::TinifyError;
+use tinify::ResizeMethod;
+use tinify::Resize;
+
+fn get_client() -> Result<Client, TinifyError> {
+  let key = "tinify api key";
+  let tinify = Tinify::new();
+
+  tinify
+    .set_key(key)
+    .get_client()
+}
+
+fn main() -> Result<(), TinifyError> {
+  let client = get_client()?;
+  let _ = client
+    .from_file("./unoptimized.jpg")?
+    .resize(Resize::new(
+      ResizeMethod::FIT,
+      Some(400),
+      Some(200)),
+    )?
+    .to_file("./resized.jpg")?;
+
   Ok(())
 }
 ```

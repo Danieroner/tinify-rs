@@ -1,26 +1,24 @@
-use crate::error::{self, TinifyException};
-use reqwest::blocking::Client as BlockingClient;
-use reqwest::blocking::Response as ReqwestResponse;
-use reqwest::Error as ReqwestError;
+use crate::error::TinifyError;
+use crate::resize::JsonData;
+use crate::resize::Resize;
+use reqwest::blocking::Client as ReqwestClient;
+use reqwest::blocking::Response;
+use reqwest::header::HeaderValue;
+use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
-use std::io::{self, BufReader, BufWriter, Read, Write};
+use reqwest::Method;
 use std::time::Duration;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 use std::fs::File;
-use std::process;
 use std::str;
-
-type TinifyError = ReqwestError;
-type TinifyResponse = ReqwestResponse;
 
 const API_ENDPOINT: &str = "https://api.tinify.com";
 
-pub enum Method {
-  Post,
-  Get,
-}
-
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Source {
   url: Option<String>,
   key: Option<String>,
@@ -28,7 +26,13 @@ pub struct Source {
 }
 
 impl Source {
-  pub fn new(url: Option<String>, key: Option<String>) -> Self {
+  pub(crate) fn new(
+    url: Option<&str>,
+    key: Option<&str>,
+  ) -> Self {
+    let url = url.map(|val| val.into());
+    let key = key.map(|val| val.into());
+
     Self {
       url,
       key,
@@ -36,115 +40,172 @@ impl Source {
     }
   }
 
-  pub fn request(
+  fn request<U>(
     &self,
     method: Method,
-    url: &str,
+    url: U,
     buffer: Option<&[u8]>,
-  ) -> Result<TinifyResponse, TinifyError> {
-    let full_url = format!("{}{}", API_ENDPOINT, url);
-    let reqwest_client = BlockingClient::new();
-    let timeout = Duration::from_secs(240);
+  ) -> Result<Response, TinifyError>
+  where
+    U: AsRef<str>,
+  {
+    let full_url =
+      format!("{}{}", API_ENDPOINT, url.as_ref());
+    let reqwest_client = ReqwestClient::new();
     let response = match method {
-      Method::Post => {
+      Method::POST => {
         reqwest_client
           .post(full_url)
           .body(buffer.unwrap().to_owned())
           .basic_auth("api", self.key.as_ref())
-          .timeout(timeout)
-          .send()
+          .timeout(Duration::from_secs(300))
+          .send()?
       },
-      Method::Get => {
+      Method::GET => {
         reqwest_client
-          .get(url)
-          .timeout(timeout)
-          .send()
+          .get(url.as_ref())
+          .timeout(Duration::from_secs(300))
+          .send()?
       },
+      _ => unreachable!(),
     };
-    if let Err(error) = response.as_ref() {
-      if error.is_connect() {
-        eprintln!("Error processing the request.");
-        process::exit(1);
-      }
-    }
-    let request_status = response.as_ref().unwrap().status();
 
-    match request_status {
+    match response.status() {
       StatusCode::UNAUTHORIZED => {
-        error::exit_error(
-          TinifyException::AccountException, 
-          &request_status
-        );
+        return Err(TinifyError::ClientError);
       },
       StatusCode::UNSUPPORTED_MEDIA_TYPE => {
-        error::exit_error(
-          TinifyException::ClientException, 
-          &request_status
-        );
+        return Err(TinifyError::ClientError);
       },
       StatusCode::SERVICE_UNAVAILABLE => {
-        error::exit_error(
-          TinifyException::ServerException, 
-          &request_status
-        );
+        return Err(TinifyError::ServerError);
       },
       _  => {},
     };
-    
-    response
+
+    Ok(response)
   }
 
-  pub fn from_file(self, path: &Path) -> Result<Self, TinifyException> {
-    let location = Path::new(path);
-    if !location.exists() {
-      return Err(TinifyException::NoFileOrDirectory);
-    }
-    let file = File::open(path).unwrap();
+  pub(crate) fn from_file<P>(
+    self,
+    path: P,
+  ) -> Result<Self, TinifyError>
+  where
+    P: AsRef<Path>,
+  {
+    let file = File::open(path)?;
     let mut reader = BufReader::new(file);
-    let mut buffer: Vec<u8> = Vec::with_capacity(reader.capacity());
-    reader.read_to_end(&mut buffer).unwrap();
-    
-    Ok(self.from_buffer(&buffer))
+    let mut buffer = Vec::with_capacity(reader.capacity());
+    reader.read_to_end(&mut buffer)?;
+
+    self.from_buffer(&buffer)
   }
 
-  pub fn from_buffer(self, buffer: &[u8]) -> Self {
+  pub(crate) fn from_buffer(
+    self,
+    buffer: &[u8],
+  ) -> Result<Self, TinifyError> {
     let response =
-      self.request(Method::Post, "/shrink", Some(buffer));
+      self.request(Method::POST, "/shrink", Some(buffer))?;
 
-    self.get_source_from_response(response.unwrap())
+    self.get_source_from_response(response)
   }
 
-  pub fn from_url(self, url: &str) -> Result<Self, TinifyException> {
-    let get = self.request(Method::Get, url, None);
-    let bytes = get.unwrap().bytes().unwrap().to_vec();
-    let post = self.request(Method::Post, "/shrink", Some(&bytes));
+  pub(crate) fn from_url<U>(
+    self,
+    url: U,
+  ) -> Result<Self, TinifyError>
+  where
+    U: AsRef<str>,
+  {
+    let get_request = self.request(Method::GET, url, None);
+    let buffer = get_request?.bytes()?;
+    let post_request =
+      self.request(Method::POST, "/shrink", Some(&buffer))?;
 
-    Ok(self.get_source_from_response(post.unwrap()))
+    self.get_source_from_response(post_request)
   }
+  
+  /// Resize the current compressed image.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use tinify::Tinify;
+  /// use tinify::Client;
+  /// use tinify::TinifyError;
+  /// use tinify::ResizeMethod;
+  /// use tinify::Resize;
+  /// 
+  /// fn get_client() -> Result<Client, TinifyError> {
+  ///   let key = "tinify api key";
+  ///   let tinify = Tinify::new();
+  ///
+  ///   tinify
+  ///     .set_key(key)
+  ///     .get_client()
+  /// }
+  /// 
+  /// fn main() -> Result<(), TinifyError> {
+  ///  let client = get_client()?;
+  ///  let _ = client
+  ///    .from_file("./unoptimized.jpg")?
+  ///    .resize(Resize::new(
+  ///      ResizeMethod::FIT,
+  ///      Some(400),
+  ///      Some(200)),
+  ///    )?
+  ///    .to_file("./resized.jpg")?;
+  ///
+  ///  Ok(())
+  /// }
+  /// ```
+  pub fn resize(
+    self,
+    resize: Resize,
+  ) -> Result<Self, TinifyError> {
+    let json_data = JsonData::new(resize);
+    let mut json_string =
+      serde_json::to_string(&json_data).unwrap();
+    let width = json_data.resize.width;
+    let height = json_data.resize.height;
+    json_string = match (
+      (width.is_some(), height.is_none()),
+      (height.is_some(), width.is_none()),
+    ) {
+      ((true, true), (_, _)) =>
+        json_string.replace(",\"height\":null", ""),
+      ((_, _), (true, true)) =>
+        json_string.replace(",\"width\":null", ""),
+      _ => json_string,
+    };
+    let reqwest_client = ReqwestClient::new();
+    let response = reqwest_client
+      .post(self.url.as_ref().unwrap())
+      .header(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+      )
+      .body(json_string)
+      .basic_auth("api", self.key.as_ref())
+      .timeout(Duration::from_secs(300))
+      .send()?;
 
-  pub fn get_source_from_response(
-    mut self,
-    response: TinifyResponse,
-  ) -> Self {
-    let optimized_location =
-      response.headers().get("location").unwrap();
-    let mut url = String::new();
-
-    if !optimized_location.is_empty() {
-      let slice =
-        str::from_utf8(optimized_location.as_bytes()).unwrap();
-      url.push_str(slice);
+    if response.status() == StatusCode::BAD_REQUEST {
+      return Err(TinifyError::ClientError);
     }
     
-    let get = self.request(Method::Get, &url, None);
-    let bytes = get.unwrap().bytes().unwrap().to_vec();
-    self.buffer = Some(bytes);
-    self.url = Some(url);
-
-    self  
+    self.get_source_from_response(response)
   }
-
-  pub fn to_file(&self, path: &str) -> io::Result<()> {
+  
+  /// Save the compressed image to a file.
+  pub fn to_file<P>(
+    &self,
+    path: P,
+  ) -> Result<(), TinifyError>
+  where
+    P: AsRef<Path>,
+  {
     let file = File::create(path)?;
     let mut reader = BufWriter::new(file);
     reader.write_all(self.buffer.as_ref().unwrap())?;
@@ -152,112 +213,50 @@ impl Source {
 
     Ok(())
   }
-
+  
+  /// Convert the compressed image to a buffer.
   pub fn to_buffer(&self) -> Vec<u8> {
     self.buffer.as_ref().unwrap().to_vec()
+  }
+
+  fn get_source_from_response(
+    mut self,
+    response: Response,
+  ) -> Result<Self, TinifyError> {
+    if let Some(location) = response.headers().get("location") {
+      let mut url = String::new();
+
+      if !location.is_empty() {
+        let slice =
+          str::from_utf8(location.as_bytes()).unwrap();
+        url.push_str(slice);
+      }
+    
+      let get_request = self.request(Method::GET, &url, None);
+      let bytes = get_request?.bytes()?.to_vec();
+      self.buffer = Some(bytes);
+      self.url = Some(url);
+    } else {
+      let bytes = response.bytes()?.to_vec();
+      self.buffer = Some(bytes);
+      self.url = None; 
+    }
+
+    Ok(self)  
   }
 }
 
 #[cfg(test)]
 mod tests {
   use super::*;
-  use dotenv::dotenv;
-  use std::env;
-  use std::fs;
-
-  fn get_key() -> String {
-    let key = match env::var("KEY") {
-      Ok(key) => key,
-      Err(_err) => panic!("No such file or directory."),
-    };
-
-    key
-  }
+  use crate::TinifyError;
+  use assert_matches::assert_matches;
 
   #[test]
-  fn test_get_request() -> Result<(), TinifyError> {
+  fn test_request_error() {
     let source = Source::new(None, None);
-    let url = "https://tinypng.com/images/panda-happy.png";
-    let _ = source.request(Method::Get, url, None)?;
+    let request = source.request(Method::GET, "", None).unwrap_err();
 
-    Ok(())
-  }
-  
-  #[test]
-  fn test_post_request() -> Result<(), TinifyError> {
-    dotenv().ok();
-    let key = get_key();
-    let source = Source::new(None, Some(key));
-    let path = Path::new("./tmp_image.jpg");
-    let bytes = fs::read(path).unwrap();
-    let _ = source
-      .request(Method::Post, "/shrink", Some(&bytes))?;
-
-    Ok(())
-  }
-
-  #[test]
-  fn test_from_file() -> Result<(), TinifyException> {
-    dotenv().ok();
-    let key = get_key();
-    let path = Path::new("./tmp_image.jpg");
-    let source = Source::new(None, Some(key));
-    let _ = source.from_file(path)?;
-
-    Ok(())
-  }
-
-  #[test]
-  fn test_from_url() -> Result<(), TinifyException> {
-    dotenv().ok();
-    let key = get_key();
-    let url = "https://tinypng.com/images/panda-happy.png";
-    let _ = Source::new(None, Some(key)).from_url(url)?;
-
-    Ok(())
-  }
-
-  #[test]
-  fn test_get_source_from_response() {
-    let key = get_key();
-    let path = Path::new("./tmp_image.jpg");
-    let source = Source::new(None, Some(key.clone()));
-    let bytes = fs::read(path).unwrap();
-    let get = source.request(Method::Post, "/shrink", Some(&bytes)).unwrap();
-    let actual = source.get_source_from_response(get);
-    let mut expected = Source::new(None, Some(key.clone()));
-    expected.buffer = actual.buffer.clone();
-    expected.url = actual.url.clone();
-
-    assert_eq!(actual, expected);
-  }
-
-  #[test]
-  fn test_to_file() {
-    let key = get_key();
-    let tmp = "./tmp_image.jpg";
-    let location = "./new_image.jpg";
-    let bytes = fs::read(tmp).unwrap();
-    let mut source = Source::new(None, Some(key.clone()));
-    source.buffer = Some(bytes);
-    let _ = source.to_file(location);
-    let exists = Path::exists(Path::new(location));
-
-    assert!(exists);
-
-    if exists {
-      fs::remove_file(location).unwrap();
-    }
-  }
-
-  #[test]
-  fn test_to_buffer() {
-    let tmp = "./tmp_image.jpg";
-    let expected = fs::read(tmp).unwrap();
-    let mut source = Source::new(None, None);
-    source.buffer = Some(expected.clone());
-    let actual = source.to_buffer();
-
-    assert_eq!(actual, expected);
+    assert_matches!(request, TinifyError::ReqwestError { .. });
   }
 }
