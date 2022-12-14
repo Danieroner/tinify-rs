@@ -73,7 +73,7 @@ impl Tinify {
   /// }
   /// ```
   pub fn get_client(&self) -> Result<Client, TinifyError> {
-    let client = Client::new(self.key.to_string());
+    let client = Client::new(self.key.as_str());
   
     Ok(client)
   }
