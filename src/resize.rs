@@ -7,13 +7,13 @@ pub struct ResizeMethod(&'static str);
 
 impl ResizeMethod {
   /// `Scales` the image down proportionally.
-  pub const SCALE: &str = "scale";
+  pub const SCALE: &'static str = "scale";
   /// `Scales` the image down proportionally so that it `fits within` the given dimensions.
-  pub const FIT: &str = "fit";
+  pub const FIT: &'static str = "fit";
   /// `Scales` the image proportionally and `crops` it if necessary so that the result has exactly the given dimensions.
-  pub const COVER: &str = "cover";
+  pub const COVER: &'static str = "cover";
   /// A more advanced implementation of cover that also detects `cut out images` with plain backgrounds.
-  pub const THUMB: &str = "thumb";
+  pub const THUMB: &'static str = "thumb";
 }
 
 /// Use the API to create resized versions of the uploaded images.
