@@ -1,24 +1,17 @@
-use crate::error::{self, TinifyException};
-use reqwest::blocking::Client as BlockingClient;
+use crate::error::TinifyError;
+use reqwest::blocking::Client as ReqwestClient;
 use reqwest::blocking::Response as ReqwestResponse;
-use reqwest::Error as ReqwestError;
 use reqwest::StatusCode;
+use reqwest::Method;
 use std::io::{self, BufReader, BufWriter, Read, Write};
 use std::time::Duration;
 use std::path::Path;
 use std::fs::File;
-use std::process;
 use std::str;
 
-type TinifyError = ReqwestError;
 type TinifyResponse = ReqwestResponse;
 
 const API_ENDPOINT: &str = "https://api.tinify.com";
-
-pub enum Method {
-  Post,
-  Get,
-}
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Source {
@@ -42,63 +35,44 @@ impl Source {
     url: &str,
     buffer: Option<&[u8]>,
   ) -> Result<TinifyResponse, TinifyError> {
-    let full_url = format!("{}{}", API_ENDPOINT, url);
-    let reqwest_client = BlockingClient::new();
-    let timeout = Duration::from_secs(240);
+    let full_url =
+      format!("{}{}", API_ENDPOINT, url);
+    let reqwest_client = ReqwestClient::new();
     let response = match method {
-      Method::Post => {
+      Method::POST => {
         reqwest_client
           .post(full_url)
           .body(buffer.unwrap().to_owned())
           .basic_auth("api", self.key.as_ref())
-          .timeout(timeout)
-          .send()
+          .timeout(Duration::from_secs(300))
+          .send()?
       },
-      Method::Get => {
+      Method::GET => {
         reqwest_client
           .get(url)
-          .timeout(timeout)
-          .send()
+          .timeout(Duration::from_secs(300))
+          .send()?
       },
+      _ => unreachable!(),
     };
-    if let Err(error) = response.as_ref() {
-      if error.is_connect() {
-        eprintln!("Error processing the request.");
-        process::exit(1);
-      }
-    }
-    let request_status = response.as_ref().unwrap().status();
-
-    match request_status {
+    
+    match response.status() {
       StatusCode::UNAUTHORIZED => {
-        error::exit_error(
-          TinifyException::AccountException, 
-          &request_status
-        );
+        return Err(TinifyError::ClientError);
       },
       StatusCode::UNSUPPORTED_MEDIA_TYPE => {
-        error::exit_error(
-          TinifyException::ClientException, 
-          &request_status
-        );
+        return Err(TinifyError::ClientError);
       },
       StatusCode::SERVICE_UNAVAILABLE => {
-        error::exit_error(
-          TinifyException::ServerException, 
-          &request_status
-        );
+        return Err(TinifyError::ServerError);
       },
       _  => {},
     };
-    
-    response
+
+    Ok(response)
   }
 
-  pub fn from_file(self, path: &Path) -> Result<Self, TinifyException> {
-    let location = Path::new(path);
-    if !location.exists() {
-      return Err(TinifyException::NoFileOrDirectory);
-    }
+  pub fn from_file(self, path: &Path) -> Result<Self, TinifyError> {
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
     let mut buffer: Vec<u8> = Vec::with_capacity(reader.capacity());
@@ -109,15 +83,15 @@ impl Source {
 
   pub fn from_buffer(self, buffer: &[u8]) -> Self {
     let response =
-      self.request(Method::Post, "/shrink", Some(buffer));
+      self.request(Method::POST, "/shrink", Some(buffer));
 
     self.get_source_from_response(response.unwrap())
   }
 
-  pub fn from_url(self, url: &str) -> Result<Self, TinifyException> {
-    let get = self.request(Method::Get, url, None);
+  pub fn from_url(self, url: &str) -> Result<Self, TinifyError> {
+    let get = self.request(Method::GET, url, None);
     let bytes = get.unwrap().bytes().unwrap().to_vec();
-    let post = self.request(Method::Post, "/shrink", Some(&bytes));
+    let post = self.request(Method::POST, "/shrink", Some(&bytes));
 
     Ok(self.get_source_from_response(post.unwrap()))
   }
@@ -136,7 +110,7 @@ impl Source {
       url.push_str(slice);
     }
     
-    let get = self.request(Method::Get, &url, None);
+    let get = self.request(Method::GET, &url, None);
     let bytes = get.unwrap().bytes().unwrap().to_vec();
     self.buffer = Some(bytes);
     self.url = Some(url);

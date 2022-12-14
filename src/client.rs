@@ -1,4 +1,4 @@
-use crate::TinifyException;
+use crate::error::TinifyError;
 use crate::source::Source;
 use std::path::Path;
 
@@ -37,7 +37,7 @@ impl Client {
   pub fn from_file(
     &self,
     path: &str,
-  ) -> Result<Source, TinifyException> {
+  ) -> Result<Source, TinifyError> {
     let path = Path::new(path);
     self
       .get_source()
@@ -69,7 +69,7 @@ impl Client {
   pub fn from_buffer(
     &self,
     buffer: &[u8],
-  ) -> Result<Source, TinifyException> {
+  ) -> Result<Source, TinifyError> {
     Ok(self.get_source().from_buffer(buffer))
   }
 
@@ -95,7 +95,7 @@ impl Client {
   pub fn from_url(
     &self,
     url: &str,
-  ) -> Result<Source, TinifyException> {
+  ) -> Result<Source, TinifyError> {
     self
       .get_source()
       .from_url(url)

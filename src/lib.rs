@@ -12,7 +12,7 @@ mod source;
 
 pub use crate::client::Client;
 pub use crate::source::Source;
-pub use crate::error::TinifyException;
+pub use crate::error::TinifyError;
 
 #[derive(Debug)]
 pub struct Tinify {
@@ -69,10 +69,7 @@ impl Tinify {
   ///   Ok(())
   /// }
   /// ```
-  pub fn get_client(&self) -> Result<Client, TinifyException> {
-    if self.key.is_empty() {
-      return Err(TinifyException::KeyException);
-    }
+  pub fn get_client(&self) -> Result<Client, TinifyError> {
     let client = Client::new(self.key.to_string());
   
     Ok(client)

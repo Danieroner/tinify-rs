@@ -1,61 +1,69 @@
-use reqwest::StatusCode;
-use std::process;
+use reqwest;
+use std::io;
 use std::fmt;
+use std::error;
 
+/// The Tinify API uses HTTP status codes to indicate success or failure.
+/// 
+/// Status codes in the 4xx range indicate there was a problem with `Client` request.
+/// 
+/// Status codes in the 5xx indicate a temporary problem with the Tinify API `Server`.
 #[derive(Debug)]
-pub enum TinifyException {
-  KeyException,
-  NoFileOrDirectory,
-  AccountException,
-  ClientException,
-  ServerException,
+pub enum TinifyError {
+  ClientError,
+  ServerError,
+  ReadError { source: io::Error },
+  WriteError { source: io::Error },
+  IOError(io::Error),
+  ReqwestError(reqwest::Error),
 }
 
-impl fmt::Display for TinifyException {
-  fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-    match self {
-      TinifyException::KeyException => {
-        write!(
-          fmt,
-          "Provide an API key with set_key(key) method",
-        )
-      },
-      TinifyException::NoFileOrDirectory => {
-        write!(
-          fmt,
-          "No such file or directory.",
-        )
-      },
-      TinifyException::AccountException => {
-        write!(
-          fmt,
-          "There was a problem with your API key or with your API account.",
-        )
-      }
-      TinifyException::ClientException => {
-        write!(
-          fmt,
-          "The request could not be completed because of a problem with the submitted data.",
-        )
-      }
-      TinifyException::ServerException => {
-        write!(
-          fmt,
-          "The request could not be completed because of a temporary problem with the Tinify API.",
-        )
-      }
+impl error::Error for TinifyError {
+  fn source(&self) -> Option<&(dyn error::Error + 'static)> {
+    match *self {
+      TinifyError::ClientError => None,
+      TinifyError::ServerError => None,
+      TinifyError::ReadError { ref source } => Some(source),
+      TinifyError::WriteError { ref source } => Some(source),
+      TinifyError::IOError(_) => None,
+      TinifyError::ReqwestError(_) => None,
     }
   }
 }
 
-pub fn exit_error(
-  type_exception: TinifyException,
-  status_code: &StatusCode,
-) {
-  eprintln!(
-    "{} status: {}",
-    type_exception,
-    &status_code,
-  );
-  process::exit(1);
+impl fmt::Display for TinifyError {
+  fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    match *self {
+      TinifyError::ClientError => {
+        write!(f, "There was a problem with the request.")
+      },
+      TinifyError::ServerError => {
+        write!(f, "There is a temporary problem with the Tinify API.")
+      },
+      TinifyError::ReadError { .. } => {
+        write!(f, "Read error")
+      },
+      TinifyError::WriteError { .. } => {
+        write!(f, "Write error")
+      },
+      TinifyError::IOError(ref err) => {
+        err.fmt(f)
+      },
+      TinifyError::ReqwestError(ref err) => {
+        err.fmt(f)
+      },
+    }
+  }
+}
+
+impl From<io::Error> for TinifyError {
+  fn from(err: io::Error) -> Self {
+    TinifyError::IOError(err)
+  }
+}
+
+impl From<reqwest::Error> for TinifyError {
+  fn from(err: reqwest::Error) -> Self {
+    TinifyError::ReqwestError(err)
+  }
 }
