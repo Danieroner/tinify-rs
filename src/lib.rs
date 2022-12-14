@@ -17,6 +17,7 @@ pub use crate::resize::Resize;
 pub use crate::resize::ResizeMethod;
 pub use crate::error::TinifyError;
 
+/// Use the API to create a new client.
 #[derive(Default)]
 pub struct Tinify {
   pub key: String,
@@ -24,16 +25,6 @@ pub struct Tinify {
 
 impl Tinify {
   /// Create a new Tinify Object.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use tinify::Tinify;
-  /// 
-  /// fn main() {
-  ///   let tinify = Tinify::new();
-  /// }
-  /// ```
   pub fn new() -> Self {
     Self {
       key: String::new(),
@@ -41,17 +32,6 @@ impl Tinify {
   }
   
   /// Set a Tinify Key.
-  ///
-  /// # Examples
-  ///
-  /// ```
-  /// use tinify::Tinify;
-  /// 
-  /// fn main() {
-  ///   let key = "tinify api key";
-  ///   let tinify = Tinify::new().set_key(key);
-  /// }
-  /// ```
   pub fn set_key<K>(
     mut self,
     key: K,
@@ -68,13 +48,14 @@ impl Tinify {
   /// # Examples
   ///
   /// ```
-  /// use tinify::{Tinify, TinifyException};
+  /// use tinify::Tinify;
+  /// use tinify::TinifyError;
   /// 
-  /// fn main() -> Result<(), TinifyException> {
+  /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
   ///   let client = tinify.get_client()?;
-  ///   
+  /// 
   ///   Ok(())
   /// }
   /// ```
