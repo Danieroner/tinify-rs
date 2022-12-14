@@ -2,14 +2,19 @@ use crate::error::TinifyError;
 use crate::source::Source;
 use std::path::Path;
 
-#[derive(Debug)]
+/// The Tinify Client.
 pub struct Client {
-  pub key: String,
+  key: String,
 }
 
 impl Client {
-  pub fn new(key: String) -> Self {
-    Self { key }
+  pub(crate) fn new<K>(key: K) -> Self
+  where
+    K: AsRef<str> + Into<String>,
+  {
+    Self { 
+      key: key.into(),
+    }
   }
 
   fn get_source(&self) -> Source {
@@ -34,11 +39,13 @@ impl Client {
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_file(
+  pub fn from_file<P>(
     &self,
-    path: &str,
-  ) -> Result<Source, TinifyError> {
-    let path = Path::new(path);
+    path: P,
+  ) -> Result<Source, TinifyError>
+  where
+    P: AsRef<Path>,
+  {
     self
       .get_source()
       .from_file(path)
@@ -94,10 +101,13 @@ impl Client {
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_url(
+  pub fn from_url<P>(
     &self,
-    url: &str,
-  ) -> Result<Source, TinifyError> {
+    url: P,
+  ) -> Result<Source, TinifyError>
+  where
+    P: AsRef<str>,
+  {
     self
       .get_source()
       .from_url(url)
