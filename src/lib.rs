@@ -17,7 +17,7 @@ pub use crate::resize::Resize;
 pub use crate::resize::ResizeMethod;
 pub use crate::error::TinifyError;
 
-#[derive(Debug)]
+#[derive(Default)]
 pub struct Tinify {
   pub key: String,
 }
