@@ -9,6 +9,7 @@
 mod error;
 mod client;
 mod source;
+mod resize;
 
 pub use crate::client::Client;
 pub use crate::source::Source;

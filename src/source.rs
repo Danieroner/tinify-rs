@@ -1,6 +1,10 @@
 use crate::error::TinifyError;
+use crate::resize::JsonData;
+use crate::resize::Resize;
 use reqwest::blocking::Client as ReqwestClient;
 use reqwest::blocking::Response as ReqwestResponse;
+use reqwest::header::HeaderValue;
+use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use reqwest::Method;
 use std::io::{self, BufReader, BufWriter, Read, Write};
@@ -94,6 +98,78 @@ impl Source {
     let post = self.request(Method::POST, "/shrink", Some(&bytes));
 
     Ok(self.get_source_from_response(post.unwrap()))
+  }
+
+  /// Resize the current compressed image.
+  ///
+  /// # Examples
+  ///
+  /// ```
+  /// use tinify::Tinify;
+  /// use tinify::Client;
+  /// use tinify::TinifyError;
+  /// use tinify::ResizeMethod;
+  /// use tinify::Resize;
+  /// 
+  /// fn get_client() -> Result<Client, TinifyError> {
+  ///   let key = "tinify api key";
+  ///   let tinify = Tinify::new();
+  ///
+  ///   tinify
+  ///     .set_key(key)
+  ///     .get_client()
+  /// }
+  /// 
+  /// fn main() -> Result<(), TinifyError> {
+  ///  let client = get_client()?;
+  ///  let _ = client
+  ///    .from_file("./unoptimized.jpg")?
+  ///    .resize(Resize::new(
+  ///      ResizeMethod::FIT,
+  ///      Some(400),
+  ///      Some(200)),
+  ///    )?
+  ///    .to_file("./resized.jpg")?;
+  ///
+  ///  Ok(())
+  /// }
+  /// ```
+  pub fn resize(
+    self,
+    resize: Resize,
+  ) -> Result<Self, TinifyError> {
+    let json_data = JsonData::new(resize);
+    let mut json_string =
+      serde_json::to_string(&json_data).unwrap();
+    let width = json_data.resize.width;
+    let height = json_data.resize.height;
+    json_string = match (
+      (width.is_some(), height.is_none()),
+      (height.is_some(), width.is_none()),
+    ) {
+      ((true, true), (_, _)) =>
+        json_string.replace(",\"height\":null", ""),
+      ((_, _), (true, true)) =>
+        json_string.replace(",\"width\":null", ""),
+      _ => json_string,
+    };
+    let reqwest_client = ReqwestClient::new();
+    let response = reqwest_client
+      .post(self.url.as_ref().unwrap())
+      .header(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+      )
+      .body(json_string)
+      .basic_auth("api", self.key.as_ref())
+      .timeout(Duration::from_secs(300))
+      .send()?;
+
+    if response.status() == StatusCode::BAD_REQUEST {
+      return Err(TinifyError::ClientError);
+    }
+    
+    Ok(self.get_source_from_response(response))
   }
 
   pub fn get_source_from_response(
