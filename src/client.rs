@@ -13,7 +13,7 @@ impl Client {
   }
 
   fn get_source(&self) -> Source {
-    Source::new(None, Some(self.key.clone())) 
+    Source::new(None, Some(self.key.as_str())) 
   }
 
   /// Choose a file to compress.
@@ -70,7 +70,9 @@ impl Client {
     &self,
     buffer: &[u8],
   ) -> Result<Source, TinifyError> {
-    Ok(self.get_source().from_buffer(buffer))
+    self
+      .get_source()
+      .from_buffer(buffer)
   }
 
   /// Choose an url file to compress.
