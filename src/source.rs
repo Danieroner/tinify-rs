@@ -93,7 +93,8 @@ impl Source {
   where
     P: AsRef<Path>,
   {
-    let file = File::open(path)?;
+    let file = File::open(path)
+      .map_err(|source| TinifyError::ReadError { source })?;
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::with_capacity(reader.capacity());
     reader.read_to_end(&mut buffer)?;
@@ -206,7 +207,8 @@ impl Source {
   where
     P: AsRef<Path>,
   {
-    let file = File::create(path)?;
+    let file = File::create(path)
+      .map_err(|source| TinifyError::WriteError { source })?;
     let mut reader = BufWriter::new(file);
     reader.write_all(self.buffer.as_ref().unwrap())?;
     reader.flush()?;
