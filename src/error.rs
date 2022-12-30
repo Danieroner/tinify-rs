@@ -1,4 +1,3 @@
-use reqwest;
 use std::io;
 use std::fmt;
 use std::error;
