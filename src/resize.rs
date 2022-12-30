@@ -44,7 +44,7 @@ impl Resize {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsonData {
+pub(crate) struct JsonData {
   pub(crate) resize: Resize,
 }
 
