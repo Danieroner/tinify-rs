@@ -118,7 +118,7 @@ impl Client {
 mod tests {
   use super::*;
   use crate::convert::Color;
-  use crate::resize::ResizeMethod;
+  use crate::resize::Method;
   use crate::resize::Resize;
   use crate::convert::Type;
   use crate::TinifyError;
@@ -257,7 +257,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::SCALE, Some(400), None))?
+      .resize(Resize::new(Method::SCALE, Some(400), None))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -280,7 +280,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::SCALE, None, Some(400)))?
+      .resize(Resize::new(Method::SCALE, None, Some(400)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -303,7 +303,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::FIT, Some(400), Some(200)))?
+      .resize(Resize::new(Method::FIT, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -326,7 +326,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::COVER, Some(400), Some(200)))?
+      .resize(Resize::new(Method::COVER, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -349,7 +349,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::THUMB, Some(400), Some(200)))?
+      .resize(Resize::new(Method::THUMB, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
