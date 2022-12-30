@@ -261,7 +261,7 @@ impl Source {
     let len = count.len();
     let parse_type = match len {
       _ if len >= 2 => serde_json::to_string(&count).unwrap(),
-      _ => count.iter().next().unwrap().to_string(),
+      _ => count.first().unwrap().to_string(),
     };
     let template = if let Some(color) = transform {
       convert::JsonData::new(
