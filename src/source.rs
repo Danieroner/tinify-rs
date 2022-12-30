@@ -205,7 +205,7 @@ impl Source {
   /// The following options are available as a type:
   /// One image type, specified as a string `"image/webp"`
   /// 
-  /// Multiple image types, specified as a tuple (`"image/webp"``, `"image/png"`).
+  /// Multiple image types, specified as a tuple (`"image/webp"`, `"image/png"`).
   /// The smallest of the provided image types will be returned.
   /// 
   /// The transform object specifies the stylistic transformations
