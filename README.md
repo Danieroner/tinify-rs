@@ -89,8 +89,8 @@ fn main() -> Result<(), TinifyError> {
 use tinify::Tinify;
 use tinify::Client;
 use tinify::TinifyError;
-use tinify::ResizeMethod;
-use tinify::Resize;
+use tinify::resize::Method;
+use tinify::resize::Resize;
 
 fn get_client() -> Result<Client, TinifyError> {
   let key = "tinify api key";
@@ -106,11 +106,60 @@ fn main() -> Result<(), TinifyError> {
   let _ = client
     .from_file("./unoptimized.jpg")?
     .resize(Resize::new(
-      ResizeMethod::FIT,
+      Method::FIT,
       Some(400),
       Some(200)),
     )?
     .to_file("./resized.jpg")?;
+
+  Ok(())
+}
+```
+
+- Converting images.
+```rust
+use tinify::Tinify;
+use tinify::convert::Type;
+use tinify::TinifyError;
+
+fn main() -> Result<(), TinifyError> {
+  let _ = Tinify::new()
+  .set_key("api key")
+  .get_client()?
+  .from_file("./tmp_image.jpg")?
+  .convert((
+      Some(Type::PNG),
+      None,
+      None,
+    ),
+    None,
+  )?
+  .to_file("./converted.png");
+
+  Ok(())
+}
+```
+
+- Converting images with a transparent background.
+```rust
+use tinify::Tinify;
+use tinify::convert::Color;
+use tinify::convert::Type;
+use tinify::TinifyError;
+
+fn main() -> Result<(), TinifyError> {
+  let _ = Tinify::new()
+  .set_key("api key")
+  .get_client()?
+  .from_url("https://tinypng.com/images/panda-happy.png")?
+  .convert((
+      Some(Type::JPEG),
+      None,
+      None,
+    ),
+    Some(Color("#FF5733")),
+  )?
+  .to_file("./converted.jpg");
 
   Ok(())
 }
