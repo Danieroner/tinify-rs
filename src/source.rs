@@ -138,8 +138,8 @@ impl Source {
   /// use tinify::Tinify;
   /// use tinify::Client;
   /// use tinify::TinifyError;
-  /// use tinify::ResizeMethod;
-  /// use tinify::Resize;
+  /// use tinify::resize::Method;
+  /// use tinify::resize::Resize;
   /// 
   /// fn get_client() -> Result<Client, TinifyError> {
   ///   let key = "tinify api key";
@@ -155,7 +155,7 @@ impl Source {
   ///   let _ = client
   ///     .from_file("./unoptimized.jpg")?
   ///     .resize(Resize::new(
-  ///       ResizeMethod::FIT,
+  ///       Method::FIT,
   ///       Some(400),
   ///       Some(200)),
   ///     )?
