@@ -3,9 +3,9 @@ use serde::Deserialize;
 
 /// The method describes the way the image will be resized.
 #[derive(Serialize, Deserialize)]
-pub struct ResizeMethod(&'static str);
+pub struct Method(&'static str);
 
-impl ResizeMethod {
+impl Method {
   /// `Scales` the image down proportionally.
   pub const SCALE: &'static str = "scale";
   /// `Scales` the image down proportionally so that it `fits within` the given dimensions.
@@ -44,7 +44,7 @@ impl Resize {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct JsonData {
+pub(crate) struct JsonData {
   pub(crate) resize: Resize,
 }
 

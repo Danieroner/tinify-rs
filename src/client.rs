@@ -117,13 +117,16 @@ impl Client {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::resize::ResizeMethod;
+  use crate::convert::Color;
+  use crate::resize::Method;
   use crate::resize::Resize;
+  use crate::convert::Type;
   use crate::TinifyError;
   use reqwest::blocking::Client as ReqwestClient;
   use assert_matches::assert_matches;
   use imagesize::size;
   use dotenv::dotenv;
+  use std::ffi::OsStr;
   use std::env;
   use std::fs;
 
@@ -254,7 +257,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::SCALE, Some(400), None))?
+      .resize(Resize::new(Method::SCALE, Some(400), None))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -277,7 +280,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::SCALE, None, Some(400)))?
+      .resize(Resize::new(Method::SCALE, None, Some(400)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -300,7 +303,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::FIT, Some(400), Some(200)))?
+      .resize(Resize::new(Method::FIT, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -323,7 +326,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::COVER, Some(400), Some(200)))?
+      .resize(Resize::new(Method::COVER, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -346,7 +349,7 @@ mod tests {
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
       .from_file("./tmp_image.jpg".to_string())?
-      .resize(Resize::new(ResizeMethod::THUMB, Some(400), Some(200)))?
+      .resize(Resize::new(Method::THUMB, Some(400), Some(200)))?
       .to_file(output)?;
 
     let (width, height) = match size(output) {
@@ -355,6 +358,160 @@ mod tests {
     };
 
     assert_eq!((width, height), (400, 200));
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_error_transparent_png_to_jpeg() -> Result<(), TinifyError> {
+    let key = get_key();
+    let request = Client::new(key)
+      .from_url("https://tinypng.com/images/panda-happy.png")?
+      .convert((
+          Some(Type::JPEG),
+          None,
+          None,
+        ),
+        None,
+      )
+    .unwrap_err();
+
+    assert_matches!(request, TinifyError::ClientError { .. });
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_transparent_png_to_jpeg() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./panda-sticker.jpg");
+    let _ = Client::new(key)
+      .from_url("https://tinypng.com/images/panda-happy.png")?
+      .convert((
+          Some(Type::JPEG),
+          None,
+          None,
+        ),
+        Some(Color("#000000")),
+      )?
+      .to_file(output);
+
+    let extension =
+      output.extension().and_then(OsStr::to_str).unwrap();
+
+    assert_eq!(extension, "jpg");
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_convert_from_jpg_to_png() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./tmp_converted.png");
+    let _ = Client::new(key)
+      .from_file(Path::new("./tmp_image.jpg"))?
+      .convert((
+          Some(Type::PNG),
+          None,
+          None,
+        ),
+        None,
+      )?
+      .to_file(output);
+
+    let extension =
+      output.extension().and_then(OsStr::to_str).unwrap();
+
+    assert_eq!(extension, "png");
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_convert_from_jpg_to_webp() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./panda-sticker.webp");
+    let _ = Client::new(key)
+      .from_url("https://tinypng.com/images/panda-happy.png")?
+      .convert((
+          Some(Type::WEBP),
+          None,
+          None,
+        ),
+        None,
+      )?
+      .to_file(output);
+
+    let extension =
+      output.extension().and_then(OsStr::to_str).unwrap();
+
+    assert_eq!(extension, "webp");
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_convert_smallest_type() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./panda-sticker.webp");
+    let _ = Client::new(key)
+      .from_url("https://tinypng.com/images/panda-happy.png")?
+      .convert((
+          Some(Type::PNG),
+          Some(Type::WEBP),
+          Some(Type::JPEG),
+        ),
+        None,
+      )?
+      .to_file(output);
+
+    let extension =
+      output.extension().and_then(OsStr::to_str).unwrap();
+
+    assert_eq!(extension, "webp");
+
+    if output.exists() {
+      fs::remove_file(output)?;
+    }
+
+    Ok(())
+  }
+
+  #[test]
+  fn test_convert_smallest_wildcard_type() -> Result<(), TinifyError> {
+    let key = get_key();
+    let output = Path::new("./panda-sticker.webp");
+    let _ = Client::new(key)
+      .from_url("https://tinypng.com/images/panda-happy.png")?
+      .convert((
+          Some(Type::WILDCARD),
+          None,
+          None,
+        ),
+        None,
+      )?
+      .to_file(output);
+
+    let extension =
+      output.extension().and_then(OsStr::to_str).unwrap();
+
+    assert_eq!(extension, "webp");
 
     if output.exists() {
       fs::remove_file(output)?;

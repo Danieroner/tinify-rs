@@ -1,6 +1,9 @@
+use crate::resize;
+use crate::convert;
+use crate::convert::Color;
+use crate::convert::Convert;
+use crate::convert::Transform;
 use crate::error::TinifyError;
-use crate::resize::JsonData;
-use crate::resize::Resize;
 use reqwest::blocking::Client as ReqwestClient;
 use reqwest::blocking::Response;
 use reqwest::header::HeaderValue;
@@ -135,8 +138,8 @@ impl Source {
   /// use tinify::Tinify;
   /// use tinify::Client;
   /// use tinify::TinifyError;
-  /// use tinify::ResizeMethod;
-  /// use tinify::Resize;
+  /// use tinify::resize::Method;
+  /// use tinify::resize::Resize;
   /// 
   /// fn get_client() -> Result<Client, TinifyError> {
   ///   let key = "tinify api key";
@@ -148,24 +151,24 @@ impl Source {
   /// }
   /// 
   /// fn main() -> Result<(), TinifyError> {
-  ///  let client = get_client()?;
-  ///  let _ = client
-  ///    .from_file("./unoptimized.jpg")?
-  ///    .resize(Resize::new(
-  ///      ResizeMethod::FIT,
-  ///      Some(400),
-  ///      Some(200)),
-  ///    )?
-  ///    .to_file("./resized.jpg")?;
+  ///   let client = get_client()?;
+  ///   let _ = client
+  ///     .from_file("./unoptimized.jpg")?
+  ///     .resize(Resize::new(
+  ///       Method::FIT,
+  ///       Some(400),
+  ///       Some(200)),
+  ///     )?
+  ///     .to_file("./resized.jpg")?;
   ///
-  ///  Ok(())
+  ///   Ok(())
   /// }
   /// ```
   pub fn resize(
     self,
-    resize: Resize,
+    resize: resize::Resize,
   ) -> Result<Self, TinifyError> {
-    let json_data = JsonData::new(resize);
+    let json_data = resize::JsonData::new(resize);
     let mut json_string =
       serde_json::to_string(&json_data).unwrap();
     let width = json_data.resize.width;
@@ -197,6 +200,104 @@ impl Source {
     }
     
     self.get_source_from_response(response)
+  }
+  
+  /// The following options are available as a type:
+  /// One image type, specified as a string `"image/webp"`
+  /// 
+  /// Multiple image types, specified as a tuple (`"image/webp"`, `"image/png"`).
+  /// The smallest of the provided image types will be returned.
+  /// 
+  /// The transform object specifies the stylistic transformations
+  /// that will be applied to the image.
+  ///
+  /// Include a background property to fill a transparent image's background.
+  ///
+  /// Specify a background color to convert an image with a transparent background
+  /// to an image type which does not support transparency (like JPEG).
+  /// 
+  /// # Examples
+  ///
+  /// ```
+  /// use tinify::Tinify;
+  /// use tinify::convert::Color;
+  /// use tinify::convert::Type;
+  /// use tinify::TinifyError;
+  ///
+  /// fn main() -> Result<(), TinifyError> {
+  ///   let _ = Tinify::new()
+  ///     .set_key("api key")
+  ///     .get_client()?
+  ///     .from_url("https://tinypng.com/images/panda-happy.png")?
+  ///     .convert((
+  ///          Some(Type::JPEG),
+  ///          None,
+  ///          None,
+  ///       ),
+  ///       Some(Color("#FF5733")),
+  ///     )?
+  ///     .to_file("./converted.webp");
+  ///
+  ///   Ok(())
+  /// }
+  /// ```
+  pub fn convert<T>(
+    self,
+    convert_type: (Option<T>, Option<T>, Option<T>),
+    transform: Option<Color>,
+  ) -> Result<Self, TinifyError>
+  where
+    T: AsRef<str> + Into<String> + Copy,
+  {
+    let types = &[
+      &convert_type.0,
+      &convert_type.1,
+      &convert_type.2,
+    ];
+    let count: Vec<String> = types
+      .iter()
+      .filter_map(|&val| val.and_then(|x| Some(x.into())))
+      .collect();
+    let len = count.len();
+    let parse_type = match len {
+      _ if len >= 2 => serde_json::to_string(&count).unwrap(),
+      _ => count.first().unwrap().to_string(),
+    };
+    let template = if let Some(color) = transform {
+      convert::JsonData::new(
+        Convert::new(parse_type),
+        Some(Transform::new(color.0)),
+      )
+    } else {
+      convert::JsonData::new(Convert::new(parse_type), None)
+    };
+
+    // Using replace to avoid invalid JSON string.
+    let json_string = serde_json::to_string(&template)
+      .unwrap()
+      .replace("\"convert_type\"", "\"type\"")
+      .replace(",\"transform\":null", "")
+      .replace("\"[", "[")
+      .replace("]\"", "]")
+      .replace("\\\"", "\"");
+    let reqwest_client = ReqwestClient::new();
+    let response = reqwest_client
+      .post(self.url.as_ref().unwrap())
+      .header(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+      )
+      .body(json_string)
+      .basic_auth("api", self.key.as_ref())
+      .timeout(Duration::from_secs(300))
+      .send()?;
+
+    if response.status() == StatusCode::BAD_REQUEST {
+      return Err(TinifyError::ClientError);
+    }
+      
+    self.get_source_from_response(response)
+
   }
   
   /// Save the compressed image to a file.
