@@ -151,17 +151,17 @@ impl Source {
   /// }
   /// 
   /// fn main() -> Result<(), TinifyError> {
-  ///  let client = get_client()?;
-  ///  let _ = client
-  ///    .from_file("./unoptimized.jpg")?
-  ///    .resize(Resize::new(
-  ///      ResizeMethod::FIT,
-  ///      Some(400),
-  ///      Some(200)),
-  ///    )?
-  ///    .to_file("./resized.jpg")?;
+  ///   let client = get_client()?;
+  ///   let _ = client
+  ///     .from_file("./unoptimized.jpg")?
+  ///     .resize(Resize::new(
+  ///       ResizeMethod::FIT,
+  ///       Some(400),
+  ///       Some(200)),
+  ///     )?
+  ///     .to_file("./resized.jpg")?;
   ///
-  ///  Ok(())
+  ///   Ok(())
   /// }
   /// ```
   pub fn resize(
@@ -201,7 +201,46 @@ impl Source {
     
     self.get_source_from_response(response)
   }
-
+  
+  /// The following options are available as a type:
+  /// One image type, specified as a string `"image/webp"`
+  /// 
+  /// Multiple image types, specified as a tuple (`"image/webp"``, `"image/png"`).
+  /// The smallest of the provided image types will be returned.
+  /// 
+  /// The transform object specifies the stylistic transformations
+  /// that will be applied to the image.
+  ///
+  /// Include a background property to fill a transparent image's background.
+  ///
+  /// Specify a background color to convert an image with a transparent background
+  /// to an image type which does not support transparency (like JPEG).
+  /// 
+  /// # Examples
+  ///
+  /// ```
+  /// use tinify::Tinify;
+  /// use tinify::convert::Color;
+  /// use tinify::convert::Type;
+  /// use tinify::TinifyError;
+  ///
+  /// fn main() -> Result<(), TinifyError> {
+  ///   let _ = Tinify::new()
+  ///     .set_key("api key")
+  ///     .get_client()?
+  ///     .from_url("https://tinypng.com/images/panda-happy.png")?
+  ///     .convert((
+  ///          Some(Type::JPEG),
+  ///          None,
+  ///          None,
+  ///       ),
+  ///       Some(Color("#FF5733")),
+  ///     )?
+  ///     .to_file("./converted.webp");
+  ///
+  ///   Ok(())
+  /// }
+  /// ```
   pub fn convert<T>(
     self,
     convert_type: (Option<T>, Option<T>, Option<T>),
@@ -233,7 +272,7 @@ impl Source {
       convert::JsonData::new(Convert::new(parse_type), None)
     };
 
-    // Using replace to avoid invalid JSON string
+    // Using replace to avoid invalid JSON string.
     let json_string = serde_json::to_string(&template)
       .unwrap()
       .replace("\"convert_type\"", "\"type\"")
