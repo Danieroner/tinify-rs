@@ -17,6 +17,17 @@ There are still features of TinyPNG to implement.
 
 To look at all the features of Tinify API: [Documentation](https://tinypng.com/developers/reference).
 
+## Roadmap
+
+ * [x] Compressing images
+ * [x] Resizing images
+ * [x] Converting images
+ * [ ] Preserving metadata
+ * [ ] Saving to Amazon S3
+ * [ ] Saving to Google Cloud Storage
+ * [ ] Implement an async non-blockling Client
+
+
 ## Getting Started
 
 Install the API client with Cargo. Add this to `Cargo.toml`:
