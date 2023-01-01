@@ -1,9 +1,22 @@
-# Tinify API client for Rust
+# Tinify API client for Rust 🦀
+
+<p align="center">
+  <img src="https://tinypng.com/images/panda-happy.png" alt="Tinify"/>
+</p>
+</p>
+<p align="center">
+  <a href="https://github.com/Danieroner/tinify-rs/actions">
+    <img alt="CI Status" src="https://github.com/Danieroner/tinify-rs/actions/workflows/ci.yml/badge.svg" />
+  </a>
+  <a href="https://crates.io/crates/tinify-rs">
+    <img alt="Crate Version" src="https://img.shields.io/crates/v/tinify-rs.svg" />
+  </a>
+</p>
 
 [![Build Status](https://github.com/Danieroner/tinify-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/Danieroner/tinify-rs/actions)
 [![crates.io](https://img.shields.io/crates/v/tinify-rs.svg)](https://crates.io/crates/tinify-rs)
 
-Rust client for the Tinify API, used for [TinyPNG](https://tinypng.com) and [TinyJPG](https://tinyjpg.com). Tinify compresses your images intelligently. Read more at [https://tinify.com](https://tinify.com).
+Tinify API Client for the Rust Programming Language, used for [TinyPNG](https://tinypng.com) and [TinyJPG](https://tinyjpg.com). Tinify compresses your images intelligently. Read more at [https://tinify.com](https://tinify.com).
 
 ## Documentation
 
@@ -25,7 +38,7 @@ To look at all the features of Tinify API: [Documentation](https://tinypng.com/d
  * [ ] Preserving metadata
  * [ ] Saving to Amazon S3
  * [ ] Saving to Google Cloud Storage
- * [ ] Implement an async non-blockling Client
+ * [ ] Implement an async non-blocking Client
 
 
 ## Getting Started
