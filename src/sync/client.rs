@@ -1,24 +1,20 @@
 use crate::error::TinifyError;
-use crate::source::Source;
+use crate::sync::source::Source;
 use std::path::Path;
 
 /// The Tinify Client.
 pub struct Client {
-  key: String,
+  source: Source,
 }
 
 impl Client {
   pub(crate) fn new<K>(key: K) -> Self
   where
-    K: AsRef<str> + Into<String>,
+    K: AsRef<str>,
   {
-    Self { 
-      key: key.into(),
+    Self {
+      source: Source::new(None, Some(key.as_ref())),
     }
-  }
-
-  fn get_source(&self) -> Source {
-    Source::new(None, Some(self.key.as_str())) 
   }
 
   /// Choose a file to compress.
@@ -26,9 +22,9 @@ impl Client {
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
-  /// use tinify::TinifyError;
-  /// 
+  /// use tinify::sync::Tinify;
+  /// use tinify::error::TinifyError;
+  ///
   /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
@@ -40,16 +36,12 @@ impl Client {
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_file<P>(
-    &self,
-    path: P,
-  ) -> Result<Source, TinifyError>
+  #[allow(clippy::wrong_self_convention)]
+  pub fn from_file<P>(self, path: P) -> Result<Source, TinifyError>
   where
     P: AsRef<Path>,
   {
-    self
-      .get_source()
-      .from_file(path)
+    self.source.from_file(path)
   }
 
   /// Choose a buffer to compress.
@@ -60,7 +52,7 @@ impl Client {
   /// use tinify::Tinify;
   /// use tinify::TinifyError;
   /// use std::fs;
-  /// 
+  ///
   /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
@@ -73,13 +65,9 @@ impl Client {
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_buffer(
-    &self,
-    buffer: &[u8],
-  ) -> Result<Source, TinifyError> {
-    self
-      .get_source()
-      .from_buffer(buffer)
+  #[allow(clippy::wrong_self_convention)]
+  pub fn from_buffer(self, buffer: &[u8]) -> Result<Source, TinifyError> {
+    self.source.from_buffer(buffer)
   }
 
   /// Choose an url image to compress.
@@ -87,9 +75,9 @@ impl Client {
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
-  /// use tinify::TinifyError;
-  /// 
+  /// use tinify::sync::Tinify;
+  /// use tinify::error::TinifyError;
+  ///
   /// fn main() -> Result<(), TinifyError> {
   ///   let key = "tinify api key";
   ///   let tinify = Tinify::new().set_key(key);
@@ -101,16 +89,12 @@ impl Client {
   ///   Ok(())
   /// }
   /// ```
-  pub fn from_url<P>(
-    &self,
-    url: P,
-  ) -> Result<Source, TinifyError>
+  #[allow(clippy::wrong_self_convention)]
+  pub fn from_url<P>(self, url: P) -> Result<Source, TinifyError>
   where
     P: AsRef<str>,
   {
-    self
-      .get_source()
-      .from_url(url)
+    self.source.from_url(url)
   }
 }
 
@@ -118,26 +102,23 @@ impl Client {
 mod tests {
   use super::*;
   use crate::convert::Color;
+  use crate::convert::Type;
   use crate::resize::Method;
   use crate::resize::Resize;
-  use crate::convert::Type;
-  use crate::TinifyError;
-  use reqwest::blocking::Client as ReqwestClient;
   use assert_matches::assert_matches;
-  use imagesize::size;
   use dotenv::dotenv;
-  use std::ffi::OsStr;
+  use imagesize::size;
+  use reqwest::blocking::Client as ReqwestClient;
   use std::env;
+  use std::ffi::OsStr;
   use std::fs;
 
   fn get_key() -> String {
     dotenv().ok();
-    let key = match env::var("KEY") {
+    match env::var("KEY") {
       Ok(key) => key,
       Err(_err) => panic!("No such file or directory."),
-    };
-  
-    key
+    }
   }
 
   #[test]
@@ -155,8 +136,7 @@ mod tests {
     let key = get_key();
     let output = Path::new("./optimized.jpg");
     let tmp_image = Path::new("./tmp_image.jpg");
-    let client = Client::new(key);
-    let _ = client.from_file(tmp_image)?.to_file(output)?;
+    let _ = Client::new(key).from_file(tmp_image)?.to_file(output);
     let actual = fs::metadata(tmp_image)?.len();
     let expected = fs::metadata(output)?.len();
 
@@ -176,8 +156,7 @@ mod tests {
     let output = Path::new("./optimized.jpg");
     let tmp_image = Path::new("./tmp_image.jpg");
     let buffer = fs::read(tmp_image).unwrap();
-    let client = Client::new(key);
-    let _ = client.from_buffer(&buffer)?.to_file(output)?;
+    let _ = Client::new(key).from_buffer(&buffer)?.to_file(output);
     let actual = fs::metadata(tmp_image)?.len();
     let expected = fs::metadata(output)?.len();
 
@@ -196,13 +175,10 @@ mod tests {
     let key = get_key();
     let output = Path::new("./optimized.jpg");
     let remote_image = "https://tinypng.com/images/panda-happy.png";
-    let client = Client::new(key);
-    let _ = client.from_url(remote_image)?.to_file(output)?;
+    let _ = Client::new(key).from_url(remote_image)?.to_file(output);
     let expected = fs::metadata(output)?.len();
 
-    let actual = ReqwestClient::new()
-      .get(remote_image)
-      .send()?;
+    let actual = ReqwestClient::new().get(remote_image).send()?;
 
     if let Some(content_length) = actual.content_length() {
       assert_eq!(content_length, 30734);
@@ -222,8 +198,7 @@ mod tests {
     let key = get_key();
     let output = Path::new("./optimized.jpg");
     let tmp_image = Path::new("./tmp_image.jpg");
-    let client = Client::new(key);
-    let _ = client.from_file(tmp_image)?.to_file(output)?;
+    let _ = Client::new(key).from_file(tmp_image)?.to_file(output);
 
     assert!(output.exists());
 
@@ -256,9 +231,9 @@ mod tests {
     let key = get_key();
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
-      .from_file("./tmp_image.jpg".to_string())?
+      .from_file("./tmp_image.jpg")?
       .resize(Resize::new(Method::SCALE, Some(400), None))?
-      .to_file(output)?;
+      .to_file(output);
 
     let (width, height) = match size(output) {
       Ok(dim) => (dim.width, dim.height),
@@ -279,9 +254,9 @@ mod tests {
     let key = get_key();
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
-      .from_file("./tmp_image.jpg".to_string())?
+      .from_file("./tmp_image.jpg")?
       .resize(Resize::new(Method::SCALE, None, Some(400)))?
-      .to_file(output)?;
+      .to_file(output);
 
     let (width, height) = match size(output) {
       Ok(dim) => (dim.width, dim.height),
@@ -302,9 +277,9 @@ mod tests {
     let key = get_key();
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
-      .from_file("./tmp_image.jpg".to_string())?
+      .from_file("./tmp_image.jpg")?
       .resize(Resize::new(Method::FIT, Some(400), Some(200)))?
-      .to_file(output)?;
+      .to_file(output);
 
     let (width, height) = match size(output) {
       Ok(dim) => (dim.width, dim.height),
@@ -325,9 +300,9 @@ mod tests {
     let key = get_key();
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
-      .from_file("./tmp_image.jpg".to_string())?
+      .from_file("./tmp_image.jpg")?
       .resize(Resize::new(Method::COVER, Some(400), Some(200)))?
-      .to_file(output)?;
+      .to_file(output);
 
     let (width, height) = match size(output) {
       Ok(dim) => (dim.width, dim.height),
@@ -348,9 +323,9 @@ mod tests {
     let key = get_key();
     let output = Path::new("./tmp_resized.jpg");
     let _ = Client::new(key)
-      .from_file("./tmp_image.jpg".to_string())?
+      .from_file("./tmp_image.jpg")?
       .resize(Resize::new(Method::THUMB, Some(400), Some(200)))?
-      .to_file(output)?;
+      .to_file(output);
 
     let (width, height) = match size(output) {
       Ok(dim) => (dim.width, dim.height),
@@ -371,14 +346,8 @@ mod tests {
     let key = get_key();
     let request = Client::new(key)
       .from_url("https://tinypng.com/images/panda-happy.png")?
-      .convert((
-          Some(Type::JPEG),
-          None,
-          None,
-        ),
-        None,
-      )
-    .unwrap_err();
+      .convert((Some(Type::JPEG), None, None), None)
+      .unwrap_err();
 
     assert_matches!(request, TinifyError::ClientError { .. });
 
@@ -391,17 +360,10 @@ mod tests {
     let output = Path::new("./panda-sticker.jpg");
     let _ = Client::new(key)
       .from_url("https://tinypng.com/images/panda-happy.png")?
-      .convert((
-          Some(Type::JPEG),
-          None,
-          None,
-        ),
-        Some(Color("#000000")),
-      )?
+      .convert((Some(Type::JPEG), None, None), Some(Color("#000000")))?
       .to_file(output);
 
-    let extension =
-      output.extension().and_then(OsStr::to_str).unwrap();
+    let extension = output.extension().and_then(OsStr::to_str).unwrap();
 
     assert_eq!(extension, "jpg");
 
@@ -418,17 +380,10 @@ mod tests {
     let output = Path::new("./tmp_converted.png");
     let _ = Client::new(key)
       .from_file(Path::new("./tmp_image.jpg"))?
-      .convert((
-          Some(Type::PNG),
-          None,
-          None,
-        ),
-        None,
-      )?
+      .convert((Some(Type::PNG), None, None), None)?
       .to_file(output);
 
-    let extension =
-      output.extension().and_then(OsStr::to_str).unwrap();
+    let extension = output.extension().and_then(OsStr::to_str).unwrap();
 
     assert_eq!(extension, "png");
 
@@ -445,17 +400,10 @@ mod tests {
     let output = Path::new("./panda-sticker.webp");
     let _ = Client::new(key)
       .from_url("https://tinypng.com/images/panda-happy.png")?
-      .convert((
-          Some(Type::WEBP),
-          None,
-          None,
-        ),
-        None,
-      )?
+      .convert((Some(Type::WEBP), None, None), None)?
       .to_file(output);
 
-    let extension =
-      output.extension().and_then(OsStr::to_str).unwrap();
+    let extension = output.extension().and_then(OsStr::to_str).unwrap();
 
     assert_eq!(extension, "webp");
 
@@ -472,17 +420,10 @@ mod tests {
     let output = Path::new("./panda-sticker.webp");
     let _ = Client::new(key)
       .from_url("https://tinypng.com/images/panda-happy.png")?
-      .convert((
-          Some(Type::PNG),
-          Some(Type::WEBP),
-          Some(Type::JPEG),
-        ),
-        None,
-      )?
+      .convert((Some(Type::PNG), Some(Type::WEBP), Some(Type::JPEG)), None)?
       .to_file(output);
 
-    let extension =
-      output.extension().and_then(OsStr::to_str).unwrap();
+    let extension = output.extension().and_then(OsStr::to_str).unwrap();
 
     assert_eq!(extension, "webp");
 
@@ -499,17 +440,10 @@ mod tests {
     let output = Path::new("./panda-sticker.webp");
     let _ = Client::new(key)
       .from_url("https://tinypng.com/images/panda-happy.png")?
-      .convert((
-          Some(Type::WILDCARD),
-          None,
-          None,
-        ),
-        None,
-      )?
+      .convert((Some(Type::WILDCARD), None, None), None)?
       .to_file(output);
 
-    let extension =
-      output.extension().and_then(OsStr::to_str).unwrap();
+    let extension = output.extension().and_then(OsStr::to_str).unwrap();
 
     assert_eq!(extension, "webp");
 
