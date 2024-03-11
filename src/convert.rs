@@ -1,13 +1,14 @@
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
-/// Tinify currently supports converting between WebP, JPEG, and PNG. 
-/// 
+/// Tinify currently supports converting between WebP, JPEG, and PNG.
+///
 /// When provided more than one image type in the convert request,
 /// the smallest version will be returned.
 #[derive(Serialize, Deserialize)]
 pub struct Type(&'static str);
 
+#[allow(dead_code)]
 impl Type {
   /// The `"image/png"` type.
   pub const PNG: &'static str = "image/png";
@@ -28,7 +29,7 @@ pub(crate) struct Convert {
 impl Convert {
   pub(crate) fn new<C>(convert_type: C) -> Self
   where
-    C: AsRef<str> + Into<String>,
+    C: Into<String>,
   {
     Self {
       convert_type: convert_type.into(),
@@ -64,13 +65,7 @@ pub(crate) struct JsonData {
 }
 
 impl JsonData {
-  pub(crate) fn new(
-    convert: Convert,
-    transform: Option<Transform>,
-  )-> Self {
-    Self { 
-      convert,
-      transform,
-    }
+  pub(crate) fn new(convert: Convert, transform: Option<Transform>) -> Self {
+    Self { convert, transform }
   }
 }

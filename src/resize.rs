@@ -1,5 +1,5 @@
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
 /// The method describes the way the image will be resized.
 #[derive(Serialize, Deserialize)]
@@ -27,11 +27,7 @@ pub struct Resize {
 }
 
 impl Resize {
-  pub fn new<M>(
-    method: M,
-    width: Option<u32>,
-    height: Option<u32>,
-  ) -> Self
+  pub fn new<M>(method: M, width: Option<u32>, height: Option<u32>) -> Self
   where
     M: AsRef<str> + Into<String>,
   {
@@ -50,8 +46,6 @@ pub(crate) struct JsonData {
 
 impl JsonData {
   pub(crate) fn new(resize: Resize) -> Self {
-    Self { 
-      resize,
-     }
+    Self { resize }
   }
 }
