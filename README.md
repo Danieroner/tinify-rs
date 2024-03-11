@@ -35,7 +35,7 @@ To look at all the features of Tinify API: [Documentation](https://tinypng.com/d
  * [ ] Preserving metadata
  * [ ] Saving to Amazon S3
  * [ ] Saving to Google Cloud Storage
- * [ ] Implement an async non-blocking Client
+ * [x] Implement an async non-blocking Client
 
 
 ## Getting Started
@@ -44,8 +44,16 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "1.2.0"
+tinify-rs = "1.3.0"
 ```
+
+Using async client
+
+```toml
+[dependencies]
+tinify-rs = { version = "1.3.0", features = ["async"] }
+```
+
 ## Usage
 
 - About key
@@ -69,118 +77,20 @@ fn main() -> Result<(), TinifyError> {
 }
 ```
 
-- Compress from an url
+- Compress from a file async
 ```rust
-use tinify::Tinify;
-use tinify::TinifyError;
+use tinify::async_bin::Tinify as AsyncTinify;
+use tinify::error::TinifyError;
 
-fn main() -> Result<(), TinifyError> {
+#[tokio::main]
+async fn main() -> Result<(), TinifyError> {
   let key = "tinify api key";
-  let tinify = Tinify::new().set_key(key);
-  let client = tinify.get_client()?;
-  let _ = client
-    .from_url("https://tinypng.com/images/panda-happy.png")?
-    .to_file("./optimized.png")?;
-    
-  Ok(())
-}
-```
-
-- Compress from a buffer
-```rust
-use tinify::Tinify;
-use tinify::TinifyError;
-use std::fs;
-
-fn main() -> Result<(), TinifyError> {
-  let key = "tinify api key";
-  let tinify = Tinify::new().set_key(key);
-  let client = tinify.get_client()?;
-  let bytes = fs::read("./unoptimized.jpg")?;
-  let _ = client
-    .from_buffer(&bytes)?
+  let tinify = AsyncTinify::new().set_key(key);
+  let client = tinify.get_async_client()?;
+  client
+    .from_file("./unoptimized.jpg")
+    .await?
     .to_file("./optimized.jpg")?;
-     
-  Ok(())
-}
-```
-
-- Resize a compressed image.
-```rust
-use tinify::Tinify;
-use tinify::Client;
-use tinify::TinifyError;
-use tinify::resize::Method;
-use tinify::resize::Resize;
-
-fn get_client() -> Result<Client, TinifyError> {
-  let key = "tinify api key";
-  let tinify = Tinify::new();
-
-  tinify
-    .set_key(key)
-    .get_client()
-}
-
-fn main() -> Result<(), TinifyError> {
-  let client = get_client()?;
-  let _ = client
-    .from_file("./unoptimized.jpg")?
-    .resize(Resize::new(
-      Method::FIT,
-      Some(400),
-      Some(200)),
-    )?
-    .to_file("./resized.jpg")?;
-
-  Ok(())
-}
-```
-
-- Converting images.
-```rust
-use tinify::Tinify;
-use tinify::convert::Type;
-use tinify::TinifyError;
-
-fn main() -> Result<(), TinifyError> {
-  let _ = Tinify::new()
-  .set_key("api key")
-  .get_client()?
-  .from_file("./tmp_image.jpg")?
-  .convert((
-      Some(Type::PNG),
-      None,
-      None,
-    ),
-    None,
-  )?
-  .to_file("./converted.png");
-
-  Ok(())
-}
-```
-
-- Converting images with a transparent background.
-```rust
-use tinify::Tinify;
-use tinify::convert::Color;
-use tinify::convert::Type;
-use tinify::TinifyError;
-
-fn main() -> Result<(), TinifyError> {
-  let _ = Tinify::new()
-  .set_key("api key")
-  .get_client()?
-  .from_url("https://tinypng.com/images/panda-happy.png")?
-  .convert((
-      Some(Type::JPEG),
-      None,
-      None,
-    ),
-    Some(Color("#FF5733")),
-  )?
-  .to_file("./converted.jpg");
 
   Ok(())
 }
@@ -191,7 +101,7 @@ fn main() -> Result<(), TinifyError> {
 Create a .env file with a TiniPNG KEY
 
 ```
-cargo test
+cargo test --features async
 ```
 
 ## Contribution
