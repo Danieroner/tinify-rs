@@ -1,11 +1,11 @@
-use std::io;
-use std::fmt;
 use std::error;
+use std::fmt;
+use std::io;
 
 /// The Tinify API uses HTTP status codes to indicate success or failure.
-/// 
+///
 /// Status codes in the 4xx range indicate there was a problem with `Client` request.
-/// 
+///
 /// Status codes in the 5xx indicate a temporary problem with the Tinify API `Server`.
 #[derive(Debug)]
 pub enum TinifyError {
@@ -35,22 +35,18 @@ impl fmt::Display for TinifyError {
     match *self {
       TinifyError::ClientError => {
         write!(f, "There was a problem with the request.")
-      },
+      }
       TinifyError::ServerError => {
         write!(f, "There is a temporary problem with the Tinify API.")
-      },
+      }
       TinifyError::ReadError { .. } => {
         write!(f, "Read error")
-      },
+      }
       TinifyError::WriteError { .. } => {
         write!(f, "Write error")
-      },
-      TinifyError::IOError(ref err) => {
-        err.fmt(f)
-      },
-      TinifyError::ReqwestError(ref err) => {
-        err.fmt(f)
-      },
+      }
+      TinifyError::IOError(ref err) => err.fmt(f),
+      TinifyError::ReqwestError(ref err) => err.fmt(f),
     }
   }
 }

@@ -1,213 +1,191 @@
-use crate::resize;
-use crate::convert;
 use crate::convert::Color;
 use crate::convert::Convert;
+use crate::convert::JsonData;
 use crate::convert::Transform;
 use crate::error::TinifyError;
-use reqwest::blocking::Client as ReqwestClient;
-use reqwest::blocking::Response;
+use crate::resize;
+use crate::API_ENDPOINT;
 use reqwest::header::HeaderValue;
 use reqwest::header::CONTENT_TYPE;
-use reqwest::StatusCode;
+use reqwest::Client as ReqwestClient;
 use reqwest::Method;
-use std::time::Duration;
+use reqwest::Response;
+use reqwest::StatusCode;
+use std::fs::File;
 use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use std::fs::File;
 use std::str;
-
-const API_ENDPOINT: &str = "https://api.tinify.com";
+use std::time::Duration;
 
 #[derive(Debug)]
 pub struct Source {
   url: Option<String>,
   key: Option<String>,
   buffer: Option<Vec<u8>>,
+  request_client: ReqwestClient,
 }
 
 impl Source {
-  pub(crate) fn new(
-    url: Option<&str>,
-    key: Option<&str>,
-  ) -> Self {
+  pub(crate) fn new(url: Option<&str>, key: Option<&str>) -> Self {
     let url = url.map(|val| val.into());
     let key = key.map(|val| val.into());
+    let request_client = ReqwestClient::new();
 
     Self {
       url,
       key,
       buffer: None,
+      request_client,
     }
   }
 
-  fn request<U>(
+  pub(crate) async fn request<U>(
     &self,
-    method: Method,
     url: U,
+    method: Method,
     buffer: Option<&[u8]>,
   ) -> Result<Response, TinifyError>
   where
     U: AsRef<str>,
   {
-    let full_url =
-      format!("{}{}", API_ENDPOINT, url.as_ref());
-    let reqwest_client = ReqwestClient::new();
+    let full_url = format!("{}{}", API_ENDPOINT, url.as_ref());
     let response = match method {
       Method::POST => {
-        reqwest_client
+        self
+          .request_client
           .post(full_url)
           .body(buffer.unwrap().to_owned())
           .basic_auth("api", self.key.as_ref())
           .timeout(Duration::from_secs(300))
-          .send()?
-      },
+          .send()
+          .await?
+      }
       Method::GET => {
-        reqwest_client
+        self
+          .request_client
           .get(url.as_ref())
           .timeout(Duration::from_secs(300))
-          .send()?
-      },
+          .send()
+          .await?
+      }
       _ => unreachable!(),
     };
 
     match response.status() {
-      StatusCode::UNAUTHORIZED => {
-        return Err(TinifyError::ClientError);
-      },
-      StatusCode::UNSUPPORTED_MEDIA_TYPE => {
-        return Err(TinifyError::ClientError);
-      },
-      StatusCode::SERVICE_UNAVAILABLE => {
-        return Err(TinifyError::ServerError);
-      },
-      _  => {},
-    };
-
-    Ok(response)
+      StatusCode::UNAUTHORIZED => Err(TinifyError::ClientError),
+      StatusCode::UNSUPPORTED_MEDIA_TYPE => Err(TinifyError::ClientError),
+      StatusCode::SERVICE_UNAVAILABLE => Err(TinifyError::ServerError),
+      _ => Ok(response),
+    }
   }
 
-  pub(crate) fn from_file<P>(
-    self,
-    path: P,
-  ) -> Result<Self, TinifyError>
+  #[allow(clippy::wrong_self_convention)]
+  pub(crate) async fn from_file<P>(self, path: P) -> Result<Self, TinifyError>
   where
     P: AsRef<Path>,
   {
-    let file = File::open(path)
-      .map_err(|source| TinifyError::ReadError { source })?;
+    let file =
+      File::open(path).map_err(|source| TinifyError::ReadError { source })?;
     let mut reader = BufReader::new(file);
     let mut buffer = Vec::with_capacity(reader.capacity());
     reader.read_to_end(&mut buffer)?;
 
-    self.from_buffer(&buffer)
+    self.from_buffer(&buffer).await
   }
 
-  pub(crate) fn from_buffer(
+  #[allow(clippy::wrong_self_convention)]
+  pub(crate) async fn from_buffer(
     self,
     buffer: &[u8],
   ) -> Result<Self, TinifyError> {
-    let response =
-      self.request(Method::POST, "/shrink", Some(buffer))?;
+    let response = self.request("/shrink", Method::POST, Some(buffer)).await?;
 
-    self.get_source_from_response(response)
+    self.get_source_from_response(response).await
   }
 
-  pub(crate) fn from_url<U>(
-    self,
-    url: U,
-  ) -> Result<Self, TinifyError>
+  #[allow(clippy::wrong_self_convention)]
+  pub(crate) async fn from_url<U>(self, url: U) -> Result<Self, TinifyError>
   where
     U: AsRef<str>,
   {
-    let get_request = self.request(Method::GET, url, None);
-    let buffer = get_request?.bytes()?;
+    let get_request = self.request(url, Method::GET, None).await?;
+    let buffer = get_request.bytes().await?;
     let post_request =
-      self.request(Method::POST, "/shrink", Some(&buffer))?;
+      self.request("/shrink", Method::POST, Some(&buffer)).await?;
 
-    self.get_source_from_response(post_request)
+    self.get_source_from_response(post_request).await
   }
-  
+
   /// Resize the current compressed image.
   ///
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
-  /// use tinify::Client;
-  /// use tinify::TinifyError;
+  /// use tinify::async_bin::Tinify as AsyncTinify;
+  /// use tinify::error::TinifyError;
   /// use tinify::resize::Method;
   /// use tinify::resize::Resize;
-  /// 
-  /// fn get_client() -> Result<Client, TinifyError> {
-  ///   let key = "tinify api key";
-  ///   let tinify = Tinify::new();
   ///
-  ///   tinify
-  ///     .set_key(key)
-  ///     .get_client()
-  /// }
-  /// 
-  /// fn main() -> Result<(), TinifyError> {
-  ///   let client = get_client()?;
-  ///   let _ = client
-  ///     .from_file("./unoptimized.jpg")?
+  /// #[tokio::main]
+  /// async fn main() -> Result<(), TinifyError> {
+  ///   let key = "l96rSTt3HV242TQWyG5DhRwfLRJzkrBg";
+  ///   let tinify = AsyncTinify::new().set_key(key);
+  ///   let client = tinify.get_async_client()?;
+  ///   client
+  ///     .from_file("./unoptimized.jpg")
+  ///     .await?
   ///     .resize(Resize::new(
   ///       Method::FIT,
   ///       Some(400),
-  ///       Some(200)),
-  ///     )?
-  ///     .to_file("./resized.jpg")?;
+  ///       Some(200),
+  ///     ))
+  ///     .await?
+  ///     .to_file("./optimized.jpg")?;
   ///
   ///   Ok(())
   /// }
   /// ```
-  pub fn resize(
+  pub async fn resize(
     self,
     resize: resize::Resize,
   ) -> Result<Self, TinifyError> {
     let json_data = resize::JsonData::new(resize);
-    let mut json_string =
-      serde_json::to_string(&json_data).unwrap();
+    let mut json_string = serde_json::to_string(&json_data).unwrap();
     let width = json_data.resize.width;
     let height = json_data.resize.height;
     json_string = match (
       (width.is_some(), height.is_none()),
       (height.is_some(), width.is_none()),
     ) {
-      ((true, true), (_, _)) =>
-        json_string.replace(",\"height\":null", ""),
-      ((_, _), (true, true)) =>
-        json_string.replace(",\"width\":null", ""),
+      ((true, true), (_, _)) => json_string.replace(",\"height\":null", ""),
+      ((_, _), (true, true)) => json_string.replace(",\"width\":null", ""),
       _ => json_string,
     };
-    let reqwest_client = ReqwestClient::new();
-    let response = reqwest_client
+    let response = self
+      .request_client
       .post(self.url.as_ref().unwrap())
-      .header(
-        CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-      )
+      .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
       .body(json_string)
       .basic_auth("api", self.key.as_ref())
       .timeout(Duration::from_secs(300))
-      .send()?;
+      .send()
+      .await?;
 
-    if response.status() == StatusCode::BAD_REQUEST {
-      return Err(TinifyError::ClientError);
+    match response.status() {
+      StatusCode::BAD_REQUEST => Err(TinifyError::ClientError),
+      _ => self.get_source_from_response(response).await,
     }
-    
-    self.get_source_from_response(response)
   }
   
   /// The following options are available as a type:
   /// One image type, specified as a string `"image/webp"`
-  /// 
+  ///
   /// Multiple image types, specified as a tuple (`"image/webp"`, `"image/png"`).
   /// The smallest of the provided image types will be returned.
-  /// 
+  ///
   /// The transform object specifies the stylistic transformations
   /// that will be applied to the image.
   ///
@@ -215,45 +193,42 @@ impl Source {
   ///
   /// Specify a background color to convert an image with a transparent background
   /// to an image type which does not support transparency (like JPEG).
-  /// 
+  ///
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
+  /// use tinify::async_bin::Tinify as AsyncTinify;
+  /// use tinify::error::TinifyError;
   /// use tinify::convert::Color;
   /// use tinify::convert::Type;
-  /// use tinify::TinifyError;
   ///
-  /// fn main() -> Result<(), TinifyError> {
-  ///   let _ = Tinify::new()
-  ///     .set_key("api key")
-  ///     .get_client()?
-  ///     .from_url("https://tinypng.com/images/panda-happy.png")?
-  ///     .convert((
-  ///          Some(Type::JPEG),
-  ///          None,
-  ///          None,
-  ///       ),
+  /// #[tokio::main]
+  /// async fn main() -> Result<(), TinifyError> {
+  ///   let key = "l96rSTt3HV242TQWyG5DhRwfLRJzkrBg";
+  ///   let tinify = AsyncTinify::new().set_key(key);
+  ///   let client = tinify.get_async_client()?;
+  ///   client
+  ///     .from_url("https://tinypng.com/images/panda-happy.png")
+  ///     .await?
+  ///     .convert(
+  ///       (Some(Type::JPEG), None, None),
   ///       Some(Color("#FF5733")),
-  ///     )?
-  ///     .to_file("./converted.webp");
+  ///     )
+  ///     .await?
+  ///     .to_file("./optimized.jpg")?;
   ///
   ///   Ok(())
   /// }
   /// ```
-  pub fn convert<T>(
+  pub async fn convert<T>(
     self,
     convert_type: (Option<T>, Option<T>, Option<T>),
     transform: Option<Color>,
   ) -> Result<Self, TinifyError>
   where
-    T: AsRef<str> + Into<String> + Copy,
+    T: Into<String> + Copy,
   {
-    let types = &[
-      &convert_type.0,
-      &convert_type.1,
-      &convert_type.2,
-    ];
+    let types = &[&convert_type.0, &convert_type.1, &convert_type.2];
     let count: Vec<String> = types
       .iter()
       .filter_map(|&val| val.and_then(|x| Some(x.into())))
@@ -264,12 +239,9 @@ impl Source {
       _ => count.first().unwrap().to_string(),
     };
     let template = if let Some(color) = transform {
-      convert::JsonData::new(
-        Convert::new(parse_type),
-        Some(Transform::new(color.0)),
-      )
+      JsonData::new(Convert::new(parse_type), Some(Transform::new(color.0)))
     } else {
-      convert::JsonData::new(Convert::new(parse_type), None)
+      JsonData::new(Convert::new(parse_type), None)
     };
 
     // Using replace to avoid invalid JSON string.
@@ -280,31 +252,25 @@ impl Source {
       .replace("\"[", "[")
       .replace("]\"", "]")
       .replace("\\\"", "\"");
-    let reqwest_client = ReqwestClient::new();
-    let response = reqwest_client
+    let response = self
+      .request_client
       .post(self.url.as_ref().unwrap())
-      .header(
-        CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-      )
+      .header(CONTENT_TYPE, HeaderValue::from_static("application/json"))
       .body(json_string)
       .basic_auth("api", self.key.as_ref())
       .timeout(Duration::from_secs(300))
-      .send()?;
+      .send()
+      .await?;
 
     if response.status() == StatusCode::BAD_REQUEST {
       return Err(TinifyError::ClientError);
     }
-      
-    self.get_source_from_response(response)
 
+    self.get_source_from_response(response).await
   }
-  
+
   /// Save the compressed image to a file.
-  pub fn to_file<P>(
-    &self,
-    path: P,
-  ) -> Result<(), TinifyError>
+  pub fn to_file<P>(&self, path: P) -> Result<(), TinifyError>
   where
     P: AsRef<Path>,
   {
@@ -316,13 +282,13 @@ impl Source {
 
     Ok(())
   }
-  
+
   /// Convert the compressed image to a buffer.
   pub fn to_buffer(&self) -> Vec<u8> {
     self.buffer.as_ref().unwrap().to_vec()
   }
 
-  fn get_source_from_response(
+  pub(crate) async fn get_source_from_response(
     mut self,
     response: Response,
   ) -> Result<Self, TinifyError> {
@@ -330,35 +296,34 @@ impl Source {
       let mut url = String::new();
 
       if !location.is_empty() {
-        let slice =
-          str::from_utf8(location.as_bytes()).unwrap();
+        let slice = str::from_utf8(location.as_bytes()).unwrap();
         url.push_str(slice);
       }
-    
-      let get_request = self.request(Method::GET, &url, None);
-      let bytes = get_request?.bytes()?.to_vec();
+
+      let get_request = self.request(&url, Method::GET, None).await?;
+      let bytes = get_request.bytes().await?.to_vec();
       self.buffer = Some(bytes);
       self.url = Some(url);
     } else {
-      let bytes = response.bytes()?.to_vec();
+      let bytes = response.bytes().await?.to_vec();
       self.buffer = Some(bytes);
-      self.url = None; 
+      self.url = None;
     }
 
-    Ok(self)  
+    Ok(self)
   }
 }
 
 #[cfg(test)]
+#[cfg(feature = "async")]
 mod tests {
   use super::*;
-  use crate::TinifyError;
   use assert_matches::assert_matches;
 
-  #[test]
-  fn test_request_error() {
+  #[tokio::test]
+  async fn test_request_error() {
     let source = Source::new(None, None);
-    let request = source.request(Method::GET, "", None).unwrap_err();
+    let request = source.request("", Method::GET, None).await.unwrap_err();
 
     assert_matches!(request, TinifyError::ReqwestError { .. });
   }
