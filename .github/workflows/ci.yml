@@ -19,10 +19,10 @@ jobs:
       - name: Install rust
         uses: hecrj/setup-rust-action@v1
         with:
-          rust-version: 1.64.0
+          rust-version: 1.75.0
       
       - name: Build
-        run: cargo build -v --release
+        run: cargo build --verbose --release
       
       - name: Test
-        run: cargo test -v --release
+        run: cargo test --verbose --release --features async
