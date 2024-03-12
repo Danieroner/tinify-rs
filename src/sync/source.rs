@@ -188,10 +188,10 @@ impl Source {
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
+  /// use tinify::sync::Tinify;
+  /// use tinify::error::TinifyError;
   /// use tinify::convert::Color;
   /// use tinify::convert::Type;
-  /// use tinify::TinifyError;
   ///
   /// fn main() -> Result<(), TinifyError> {
   ///   let _ = Tinify::new()
