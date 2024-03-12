@@ -49,8 +49,8 @@ impl Client {
   /// # Examples
   ///
   /// ```
-  /// use tinify::Tinify;
-  /// use tinify::TinifyError;
+  /// use tinify::sync::Tinify;
+  /// use tinify::error::TinifyError;
   /// use std::fs;
   ///
   /// fn main() -> Result<(), TinifyError> {

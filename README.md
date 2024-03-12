@@ -62,8 +62,8 @@ tinify-rs = { version = "1.3.0", features = ["async"] }
 
 - Compress from a file
 ```rust
-use tinify::Tinify;
-use tinify::TinifyError;
+use tinify::sync::Tinify;
+use tinify::error::TinifyError;
 
 fn main() -> Result<(), TinifyError> {
   let key = "tinify api key";
