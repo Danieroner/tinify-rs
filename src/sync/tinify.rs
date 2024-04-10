@@ -14,10 +14,7 @@ impl Tinify {
   }
 
   /// Set a Tinify Key.
-  pub fn set_key<K>(mut self, key: K) -> Self
-  where
-    K: Into<String>,
-  {
+  pub fn set_key(mut self, key: &str) -> Self {
     self.key = key.into();
     self
   }
@@ -58,7 +55,7 @@ mod tests {
       Ok(key) => key,
       Err(_err) => panic!("No such file or directory."),
     };
-    let _ = Tinify::new().set_key(key).get_client()?;
+    let _ = Tinify::new().set_key(&key).get_client()?;
 
     Ok(())
   }

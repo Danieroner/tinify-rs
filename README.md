@@ -1,10 +1,6 @@
 # Tinify API client for Rust 🦀
 
 <p align="center">
-  <img src="https://tinypng.com/images/panda-happy.png" alt="Tinify"/>
-</p>
-</p>
-<p align="center">
   <a href="https://github.com/Danieroner/tinify-rs/actions">
     <img alt="CI Status" src="https://github.com/Danieroner/tinify-rs/actions/workflows/ci.yml/badge.svg" />
   </a>
@@ -44,14 +40,14 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "1.3.0"
+tinify-rs = "1.4.0"
 ```
 
 Using async client
 
 ```toml
 [dependencies]
-tinify-rs = { version = "1.3.0", features = ["async"] }
+tinify-rs = { version = "1.4.0", features = ["async"] }
 ```
 
 ## Usage
@@ -62,38 +58,61 @@ tinify-rs = { version = "1.3.0", features = ["async"] }
 
 - Compress from a file
 ```rust
-use tinify::sync::Tinify;
 use tinify::error::TinifyError;
+use tinify::sync::Tinify;
+use std::path::Path;
 
 fn main() -> Result<(), TinifyError> {
-  let key = "tinify api key";
+  let key = "api key";
+  let output = Path::new("./optimized.jpg");
   let tinify = Tinify::new().set_key(key);
-  let client = tinify.get_client()?;
-  let _ = client
+  let optimized = tinify
+    .get_client()?
     .from_file("./unoptimized.jpg")?
-    .to_file("./optimized.jpg")?;
-    
+    .to_file(output);
+
+  if let Err(error) = optimized {
+    match error {
+      TinifyError::ClientError { ref upstream } => {
+        println!("Error: {} message: {}", upstream.error, upstream.message);
+      }
+      _ => println!("{:?}", error),
+    }
+  }
+
   Ok(())
 }
+
 ```
 
 - Compress from a file async
 ```rust
-use tinify::async_bin::Tinify as AsyncTinify;
 use tinify::error::TinifyError;
+use tinify::async_bin::Tinify;
+use std::path::Path;
 
 #[tokio::main]
 async fn main() -> Result<(), TinifyError> {
-  let key = "tinify api key";
-  let tinify = AsyncTinify::new().set_key(key);
-  let client = tinify.get_async_client()?;
-  client
-    .from_file("./unoptimized.jpg")
-    .await?
-    .to_file("./optimized.jpg")?;
+  let key = "api key";
+  let output = Path::new("./optimized.jpg");
+  let tinify = Tinify::new().set_key(key);
+  let compressed = tinify
+    .get_async_client()?
+    .from_file("./unoptimized.jpg").await?
+    .to_file(output).await;
+
+  if let Err(error) = compressed {
+    match error {
+      TinifyError::ClientError { ref upstream } => {
+        println!("Error: {} message: {}", upstream.error, upstream.message);
+      }
+      _ => println!("{:?}", error),
+    }
+  }
 
   Ok(())
 }
+
 ```
 
 ## Running tests
