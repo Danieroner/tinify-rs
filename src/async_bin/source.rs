@@ -110,12 +110,11 @@ impl Source {
           serde_json::from_str(&compressed_image.text().await?)?;
         Err(TinifyError::ClientError { upstream })
       }
-      StatusCode::SERVICE_UNAVAILABLE => {
+      _ => {
         let upstream: Upstream =
           serde_json::from_str(&compressed_image.text().await?)?;
         Err(TinifyError::ServerError { upstream })
       }
-      _ => unreachable!(),
     }
   }
 
