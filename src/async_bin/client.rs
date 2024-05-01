@@ -24,7 +24,6 @@ impl Client {
   {
     self.source.from_file(path).await
   }
-  
 
   /// Choose a buffer to compress.
   pub async fn from_buffer(self, buffer: &[u8]) -> Result<Source, TinifyError> {

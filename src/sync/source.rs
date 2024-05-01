@@ -106,12 +106,11 @@ impl Source {
           serde_json::from_str(&compressed_image.text()?)?;
         Err(TinifyError::ClientError { upstream })
       }
-      StatusCode::SERVICE_UNAVAILABLE => {
+      _ => {
         let upstream: Upstream =
           serde_json::from_str(&compressed_image.text()?)?;
         Err(TinifyError::ServerError { upstream })
       }
-      _ => unreachable!(),
     }
   }
 
@@ -207,7 +206,7 @@ impl Source {
       Err(TinifyError::ClientError { upstream })
     }
   }
-  
+
   /// Save the current compressed image to a file.
   pub fn to_file<P>(&mut self, path: P) -> Result<(), TinifyError>
   where
