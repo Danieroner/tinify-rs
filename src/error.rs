@@ -3,6 +3,8 @@ use serde::Serialize;
 use std::error;
 use std::fmt;
 use std::io;
+#[cfg(feature = "async")]
+use tokio::task;
 
 /// Tinify remote error message received.
 #[derive(Serialize, Deserialize, Debug)]
@@ -14,13 +16,19 @@ pub struct Upstream {
 /// The `TinifyError` enum indicates whether a client or server error occurs.
 #[derive(Debug)]
 pub enum TinifyError {
-  ClientError { upstream: Upstream },
-  ServerError { upstream: Upstream },
+  ClientError {
+    upstream: Upstream,
+  },
+  ServerError {
+    upstream: Upstream,
+  },
   ReqwestError(reqwest::Error),
   ReqwestConvertError(reqwest::header::ToStrError),
   UrlParseError(url::ParseError),
   JsonParseError(serde_json::Error),
   IOError(io::Error),
+  #[cfg(feature = "async")]
+  TokioError(task::JoinError),
 }
 
 impl error::Error for TinifyError {
@@ -33,6 +41,8 @@ impl error::Error for TinifyError {
       TinifyError::UrlParseError(ref source) => Some(source),
       TinifyError::JsonParseError(ref source) => Some(source),
       TinifyError::IOError(ref source) => Some(source),
+      #[cfg(feature = "async")]
+      TinifyError::TokioError(ref source) => Some(source),
     }
   }
 }
@@ -51,6 +61,8 @@ impl fmt::Display for TinifyError {
       TinifyError::UrlParseError(ref err) => err.fmt(f),
       TinifyError::JsonParseError(ref err) => err.fmt(f),
       TinifyError::IOError(ref err) => err.fmt(f),
+      #[cfg(feature = "async")]
+      TinifyError::TokioError(ref err) => err.fmt(f),
     }
   }
 }
@@ -82,5 +94,12 @@ impl From<url::ParseError> for TinifyError {
 impl From<serde_json::Error> for TinifyError {
   fn from(err: serde_json::Error) -> Self {
     TinifyError::JsonParseError(err)
+  }
+}
+
+#[cfg(feature = "async")]
+impl From<tokio::task::JoinError> for TinifyError {
+  fn from(err: tokio::task::JoinError) -> Self {
+    TinifyError::TokioError(err)
   }
 }
