@@ -17,6 +17,7 @@ pub mod async_bin;
 pub mod convert;
 pub mod error;
 pub mod resize;
+#[cfg(not(feature = "async"))]
 pub mod sync;
 pub mod transform;
 

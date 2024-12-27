@@ -1,6 +1,6 @@
 [package]
 name = "tinify-rs"
-version = "1.4.1"
+version = "1.4.2"
 edition = "2021"
 description = "A Rust client for the Tinify API"
 authors = ["The tinify-rs Developers"]

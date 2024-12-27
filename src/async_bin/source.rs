@@ -20,6 +20,7 @@ use std::io::Write;
 use std::path::Path;
 use std::str;
 use std::time::Duration;
+use tokio::task;
 use url::Url;
 
 #[derive(Debug)]
@@ -220,7 +221,7 @@ impl Source {
   /// Save the current compressed image to a file.
   pub async fn to_file<P>(&mut self, path: P) -> Result<(), TinifyError>
   where
-    P: AsRef<Path>,
+    P: AsRef<Path> + Send + 'static,
   {
     if self.operations.convert.is_some()
       || self.operations.resize.is_some()
@@ -230,7 +231,7 @@ impl Source {
     }
 
     if let Some(ref buffer) = self.buffer {
-      let file = File::create(path)?;
+      let file = task::spawn_blocking(move || File::create(path)).await??;
       let mut reader = BufWriter::new(file);
       reader.write_all(buffer)?;
       reader.flush()?;
