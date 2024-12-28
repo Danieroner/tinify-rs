@@ -40,14 +40,14 @@ Install the API client with Cargo. Add this to `Cargo.toml`:
 
 ```toml
 [dependencies]
-tinify-rs = "1.4.1"
+tinify-rs = "1.4.2"
 ```
 
 Using async client
 
 ```toml
 [dependencies]
-tinify-rs = { version = "1.4.1", features = ["async"] }
+tinify-rs = { version = "1.4.2", features = ["async"] }
 ```
 
 ## Usage
